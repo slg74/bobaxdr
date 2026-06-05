@@ -25,6 +25,8 @@ BENIGN_PROCESSES = {
     "steam", "steam_osx", "steamwebhelper",
     # VS Code — helper processes beacon to Azure for telemetry/extension sync
     "code", "code helper", "code h",
+    # Claude Code — persistent connection to Anthropic API while active
+    "claude",
 }
 
 
