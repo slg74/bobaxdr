@@ -204,8 +204,9 @@ class DetectionEngine:
                         f"Device queried threat-intel flagged domain: {domain}",
                         domain)
 
-        # DNS tunneling — query on non-standard port
-        if dst_port not in (53, 853, 5353):
+        # DNS tunneling — query on non-standard port, external destination only
+        # (ephemeral ports on private IPs are normal DNS response routing)
+        if dst_port not in (53, 853, 5353) and dst_ip and not _is_private(dst_ip):
             self._alert(db, endpoint_id, hostname, "DNS_TUNNELING", "medium",
                         "DNS over non-standard port (possible tunneling)",
                         f"DNS query to {dst_ip}:{dst_port} — standard is 53/853",
