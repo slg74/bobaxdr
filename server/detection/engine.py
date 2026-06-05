@@ -67,6 +67,8 @@ class DetectionEngine:
         self.ti = threat_intel
         # beaconing: (hostname, dst_ip, proc) -> deque of datetimes
         self._beacon: Dict[tuple, deque] = defaultdict(lambda: deque(maxlen=50))
+        # abused domain frequency: (hostname, domain) -> deque of datetimes
+        self._abuse_freq: Dict[tuple, deque] = defaultdict(lambda: deque(maxlen=50))
 
     # Called as a background task — creates its own DB session
     def run_detection(self, event_data: dict, endpoint_id: int):
@@ -198,11 +200,30 @@ class DetectionEngine:
         if not domain:
             return
 
+        # Tier 1 — purely malicious domain: alert immediately
         if self.ti.is_malicious_domain(domain):
             self._alert(db, endpoint_id, hostname, "MALICIOUS_DOMAIN_DNS", "high",
                         "DNS query for known malicious domain",
                         f"Device queried threat-intel flagged domain: {domain}",
                         domain)
+
+        # Tier 2 — abused-but-legitimate domain: alert only on unusual volume
+        elif self.ti.is_abused_domain(domain):
+            key = (hostname, domain)
+            now = datetime.utcnow()
+            self._abuse_freq[key].append(now)
+            # Evict entries outside the window
+            window_start = now - timedelta(seconds=self.ti.abuse_window_secs)
+            while self._abuse_freq[key] and self._abuse_freq[key][0] < window_start:
+                self._abuse_freq[key].popleft()
+            count = len(self._abuse_freq[key])
+            if count >= self.ti.abuse_threshold:
+                self._alert(db, endpoint_id, hostname, "ABUSED_HOSTING_DOMAIN", "medium",
+                            f"Unusual query volume to known file-hosting domain",
+                            f"{domain} queried {count}x in {self.ti.abuse_window_secs}s — "
+                            f"possible automated payload fetch (threshold: {self.ti.abuse_threshold})",
+                            domain)
+                self._abuse_freq[key].clear()
 
         # DNS tunneling — query on non-standard port, external destination only
         # (ephemeral ports on private IPs are normal DNS response routing)

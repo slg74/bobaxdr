@@ -59,8 +59,44 @@ class ThreatIntel:
                 "54.0.0.0/8",       # Amazon AWS
                 "3.0.0.0/8",        # Amazon AWS
                 "13.32.0.0/12",     # Amazon CloudFront
+                "150.171.0.0/16",   # Microsoft
+                "13.64.0.0/11",     # Microsoft Azure
+                "13.96.0.0/13",     # Microsoft Azure
+                "13.104.0.0/14",    # Microsoft Azure
+                "20.0.0.0/8",       # Microsoft Azure
+                "40.0.0.0/8",       # Microsoft Azure
             ]
         ]
+
+        # Hard allowlist — legitimate domains that should never alert even at
+        # high query volume (user-facing services with no meaningful abuse signal
+        # from DNS queries alone).
+        self._domain_allowlist: Set[str] = {
+            "google.com", "googleapis.com", "gstatic.com",
+            "microsoft.com", "windows.com", "live.com",
+            "apple.com", "icloud.com", "mzstatic.com",
+            "amazon.com", "amazonaws.com",
+            "cloudflare.com", "fastly.net", "akamai.net",
+        }
+
+        # Abused-but-legitimate domains — appear in URLhaus because attackers use
+        # their file hosting, but a single query is normal. Alert only on unusual
+        # volume (5+ queries in 2 minutes) which suggests automated payload fetching.
+        self.abused_domains: Set[str] = {
+            "docs.google.com", "drive.google.com", "sheets.google.com",
+            "slides.google.com", "storage.googleapis.com",
+            "raw.githubusercontent.com", "gist.github.com", "githubusercontent.com",
+            "pastebin.com", "paste.ee", "rentry.co", "hastebin.com",
+            "cdn.discordapp.com", "media.discordapp.net", "discord.com",
+            "dl.dropboxusercontent.com", "dropbox.com",
+            "onedrive.live.com", "1drv.ms",
+            "t.me", "telegram.org",
+            "transfer.sh", "file.io", "gofile.io", "anonfiles.com",
+        }
+
+        # Volume threshold: N queries within WINDOW seconds triggers an alert
+        self.abuse_threshold = 5
+        self.abuse_window_secs = 120
 
     async def refresh(self):
         if self.last_refresh and datetime.utcnow() - self.last_refresh < self._refresh_interval:
@@ -108,8 +144,25 @@ class ThreatIntel:
     def is_malicious_ip(self, ip: str) -> bool:
         return ip in self.malicious_ips
 
+    def _domain_matches(self, domain: str, domain_set: Set[str]) -> bool:
+        return domain in domain_set or any(
+            domain == d or domain.endswith("." + d) for d in domain_set
+        )
+
     def is_malicious_domain(self, domain: str) -> bool:
-        return domain.lower().rstrip(".") in self.malicious_domains
+        d = domain.lower().rstrip(".")
+        # Hard allowlist and abused-but-legitimate domains are handled separately
+        if self._domain_matches(d, self._domain_allowlist):
+            return False
+        if self._domain_matches(d, self.abused_domains):
+            return False
+        return d in self.malicious_domains
+
+    def is_abused_domain(self, domain: str) -> bool:
+        """True if domain is a legitimate service known to be abused for payload hosting.
+        Abused list takes priority over the hard allowlist."""
+        d = domain.lower().rstrip(".")
+        return self._domain_matches(d, self.abused_domains)
 
     def is_miner_process(self, name: str) -> bool:
         n = name.lower()
