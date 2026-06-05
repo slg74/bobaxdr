@@ -2,6 +2,11 @@ import os
 import sys
 import secrets
 import logging
+import threading
+import asyncio
+import socket as _socket
+import re as _re
+from collections import defaultdict
 from datetime import datetime, timedelta
 from contextlib import asynccontextmanager
 from typing import Optional
@@ -43,6 +48,63 @@ else:
 # ── Core components ──────────────────────────────────────────────────────────
 threat_intel = ThreatIntel()
 engine_ = DetectionEngine(threat_intel)
+
+_PRIVATE = ("10.", "127.", "::1", "169.254.", "192.168.",
+            "172.16.", "172.17.", "172.18.", "172.19.", "172.20.",
+            "172.21.", "172.22.", "172.23.", "172.24.", "172.25.", "172.26.",
+            "172.27.", "172.28.", "172.29.", "172.30.", "172.31.")
+
+
+class TopTalkersTracker:
+    def __init__(self):
+        self._lock = threading.Lock()
+        self._data: dict[str, dict] = {}
+
+    def record(self, connections: list, hostname: str):
+        now = datetime.utcnow()
+        with self._lock:
+            for c in connections:
+                ip = c.get("raddr", "")
+                if not ip or any(ip.startswith(p) for p in _PRIVATE):
+                    continue
+                if ip not in self._data:
+                    self._data[ip] = {
+                        "ip": ip,
+                        "count": 0,
+                        "endpoints": set(),
+                        "processes": set(),
+                        "ports": set(),
+                        "first_seen": now,
+                        "last_seen": now,
+                    }
+                d = self._data[ip]
+                d["count"] += 1
+                d["endpoints"].add(hostname)
+                d["last_seen"] = now
+                if c.get("process"):
+                    d["processes"].add(c["process"])
+                if c.get("rport"):
+                    d["ports"].add(int(c["rport"]))
+
+    def top(self, n: int = 30) -> list:
+        with self._lock:
+            items = sorted(self._data.values(), key=lambda x: x["count"], reverse=True)[:n]
+            return [
+                {
+                    "ip": d["ip"],
+                    "count": d["count"],
+                    "endpoints": sorted(d["endpoints"]),
+                    "processes": sorted(d["processes"])[:5],
+                    "ports": sorted(d["ports"])[:8],
+                    "first_seen": d["first_seen"].isoformat(),
+                    "last_seen": d["last_seen"].isoformat(),
+                    "is_malicious": threat_intel.is_malicious_ip(d["ip"]),
+                }
+                for d in items
+            ]
+
+
+talkers = TopTalkersTracker()
 
 STATIC_DIR = os.path.join(os.path.dirname(__file__), "static")
 
@@ -110,6 +172,9 @@ async def ingest_event(
     )
     db.add(ev)
     db.commit()
+
+    if data.get("type") == "network_connections":
+        talkers.record(data.get("connections", []), hostname)
 
     background_tasks.add_task(engine_.run_detection, data, ep.id)
     return {"status": "ok", "event_id": ev.id}
@@ -184,10 +249,21 @@ async def dashboard_stats(db: Session = Depends(get_db), _=Depends(auth)):
     }
 
 
+# ── Top Talkers ───────────────────────────────────────────────────────────────
+@app.get("/api/top-talkers")
+async def top_talkers(limit: int = 30, _=Depends(auth)):
+    return talkers.top(limit)
+
+
 # ── Threat Intel ──────────────────────────────────────────────────────────────
 @app.get("/api/threat-intel")
 async def ti_status(_=Depends(auth)):
     return threat_intel.status()
+
+
+@app.get("/api/threat-intel/ips")
+async def ti_ips(_=Depends(auth)):
+    return sorted(threat_intel.malicious_ips)
 
 
 @app.post("/api/threat-intel/refresh")
@@ -195,6 +271,35 @@ async def ti_refresh(_=Depends(auth)):
     threat_intel.last_refresh = None
     await threat_intel.refresh()
     return threat_intel.status()
+
+
+# ── Reverse DNS ───────────────────────────────────────────────────────────────
+_rdns_cache: dict[str, tuple[str, float]] = {}
+_RDNS_TTL = 3600
+
+
+@app.get("/api/resolve/{ip}")
+async def resolve_ip(ip: str, _=Depends(auth)):
+    if not _re.match(r'^[\d.a-f:]+$', ip):
+        raise HTTPException(status_code=400, detail="Invalid IP")
+
+    now = datetime.utcnow().timestamp()
+    if ip in _rdns_cache:
+        hostname, ts = _rdns_cache[ip]
+        if now - ts < _RDNS_TTL:
+            return {"ip": ip, "hostname": hostname}
+
+    try:
+        loop = asyncio.get_event_loop()
+        result = await loop.run_in_executor(None, _socket.gethostbyaddr, ip)
+        hostname = result[0]
+    except _socket.herror:
+        hostname = "no PTR record"
+    except Exception as e:
+        hostname = f"lookup failed"
+
+    _rdns_cache[ip] = (hostname, now)
+    return {"ip": ip, "hostname": hostname}
 
 
 if __name__ == "__main__":

@@ -17,7 +17,6 @@
   --high:     #f97316;
   --medium:   #eab308;
   --low:      #22c55e;
-  --info:     #64748b;
 }
 * { box-sizing: border-box; margin: 0; padding: 0; }
 body {
@@ -34,12 +33,8 @@ header {
   border-bottom: 1px solid var(--border);
   padding: 0 28px;
   height: 54px;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  position: sticky;
-  top: 0;
-  z-index: 100;
+  display: flex; align-items: center; justify-content: space-between;
+  position: sticky; top: 0; z-index: 100;
 }
 .logo { font-size: 17px; font-weight: 700; letter-spacing: -0.3px; }
 .logo em { color: var(--accent); font-style: normal; }
@@ -63,10 +58,7 @@ main { padding: 24px 28px; max-width: 1440px; margin: 0 auto; }
   border-radius: 10px;
   padding: 18px 20px;
 }
-.card-label {
-  font-size: 10px; text-transform: uppercase; letter-spacing: 1px;
-  color: var(--muted); margin-bottom: 10px;
-}
+.card-label { font-size: 10px; text-transform: uppercase; letter-spacing: 1px; color: var(--muted); margin-bottom: 10px; }
 .card-value { font-size: 34px; font-weight: 700; line-height: 1; }
 .card-value.ok       { color: var(--low); }
 .card-value.warn     { color: var(--high); }
@@ -78,45 +70,45 @@ main { padding: 24px 28px; max-width: 1440px; margin: 0 auto; }
 .layout { display: grid; grid-template-columns: 1fr 360px; gap: 14px; }
 
 /* ── Panel ── */
-.panel {
-  background: var(--surface);
-  border: 1px solid var(--border);
-  border-radius: 10px;
-  overflow: hidden;
-}
+.panel { background: var(--surface); border: 1px solid var(--border); border-radius: 10px; overflow: hidden; }
 .panel + .panel { margin-top: 14px; }
 .panel-head {
-  padding: 13px 18px;
   border-bottom: 1px solid var(--border);
-  display: flex; align-items: center; justify-content: space-between;
+  display: flex; align-items: stretch; justify-content: space-between;
 }
-.panel-title { font-weight: 600; font-size: 12px; text-transform: uppercase; letter-spacing: 0.6px; color: var(--text); }
+.panel-title { font-weight: 600; font-size: 12px; text-transform: uppercase; letter-spacing: 0.6px; color: var(--text); padding: 13px 18px; }
 .count-badge {
-  background: var(--surface2);
-  border: 1px solid var(--border);
-  border-radius: 10px;
-  padding: 2px 9px;
-  font-size: 11px;
-  color: var(--muted);
+  background: var(--surface2); border: 1px solid var(--border);
+  border-radius: 10px; padding: 2px 9px; font-size: 11px; color: var(--muted);
+  align-self: center; margin-right: 14px;
 }
 
-/* ── Filter bar ── */
-.filters {
-  padding: 10px 18px;
-  border-bottom: 1px solid var(--border);
-  display: flex; gap: 6px;
+/* ── Panel tabs ── */
+.tab-bar { display: flex; align-items: stretch; flex: 1; }
+.ptab {
+  padding: 0 18px; height: 44px;
+  display: flex; align-items: center;
+  font-size: 12px; font-weight: 500;
+  color: var(--muted); cursor: pointer;
+  border: none; background: none;
+  border-bottom: 2px solid transparent;
+  transition: all .12s;
 }
+.ptab.on { color: var(--text); border-bottom-color: var(--accent); }
+.ptab:hover:not(.on) { color: var(--text); }
+
+/* ── Filter bar ── */
+.filters { padding: 10px 18px; border-bottom: 1px solid var(--border); display: flex; gap: 6px; }
 .flt {
   padding: 4px 12px; border-radius: 5px;
   border: 1px solid var(--border);
   background: none; color: var(--muted);
-  cursor: pointer; font-size: 11px; font-weight: 500;
-  transition: all 0.12s;
+  cursor: pointer; font-size: 11px; font-weight: 500; transition: all 0.12s;
 }
 .flt.on { background: var(--accent); border-color: var(--accent); color: #fff; }
 .flt:hover:not(.on) { border-color: #374151; color: var(--text); }
 
-/* ── Alert table ── */
+/* ── Tables ── */
 table { width: 100%; border-collapse: collapse; }
 th {
   text-align: left; padding: 9px 16px;
@@ -141,11 +133,12 @@ tr:hover td { background: rgba(59,130,246,.04); }
 .b-low      { background:rgba(34,197,94,.14);  color:#4ade80; border:1px solid rgba(34,197,94,.3); }
 .b-info     { background:rgba(100,116,139,.14);color:#94a3b8; border:1px solid rgba(100,116,139,.3); }
 
-/* ── Alert cell content ── */
+/* ── Alert cells ── */
 .alert-title { font-size: 13px; line-height: 1.4; }
 .alert-desc  { font-size: 11px; color: var(--muted); margin-top: 3px; max-width: 380px; line-height: 1.5; }
 .mono { font-family: 'SF Mono', 'Consolas', monospace; font-size: 11px; color: #94a3b8; }
 .t-muted { color: var(--muted); font-size: 11px; white-space: nowrap; }
+.rule { font-size: 10px; font-family: monospace; color: var(--muted); }
 
 /* ── Ack button ── */
 .ack {
@@ -155,37 +148,67 @@ tr:hover td { background: rgba(59,130,246,.04); }
 }
 .ack:hover { border-color: var(--accent); color: var(--accent); }
 
+/* ── Top Talkers ── */
+.talker-ip { font-family: 'SF Mono','Consolas',monospace; font-size: 12px; font-weight: 600; }
+.talker-ip.bad { color: #f87171; }
+.malicious-tag {
+  display: inline-block; margin-left: 6px;
+  padding: 1px 5px; border-radius: 3px;
+  font-size: 9px; font-weight: 700; text-transform: uppercase;
+  background: rgba(239,68,68,.2); color: #f87171; border: 1px solid rgba(239,68,68,.4);
+}
+.conn-count { font-size: 18px; font-weight: 700; color: var(--text); }
+.conn-bar-wrap { width: 80px; height: 4px; background: var(--border); border-radius: 2px; margin-top: 4px; }
+.conn-bar { height: 4px; border-radius: 2px; background: var(--accent); }
+.conn-bar.bad { background: var(--critical); }
+.tag-list { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 4px; }
+.tag {
+  padding: 1px 6px; border-radius: 3px; font-size: 10px;
+  background: var(--surface2); border: 1px solid var(--border); color: var(--muted);
+}
+
 /* ── Endpoint rows ── */
 .ep-row {
   display: flex; align-items: center; justify-content: space-between;
-  padding: 11px 18px;
-  border-bottom: 1px solid rgba(30,38,64,.6);
+  padding: 11px 18px; border-bottom: 1px solid rgba(30,38,64,.6);
 }
 .ep-row:last-child { border-bottom: none; }
-.ep-dot {
-  width: 6px; height: 6px; border-radius: 50%;
-  display: inline-block; margin-right: 8px; flex-shrink: 0;
-}
-.ep-dot.on  { background: var(--low); }
+.ep-dot { width: 6px; height: 6px; border-radius: 50%; display: inline-block; margin-right: 8px; flex-shrink: 0; }
+.ep-dot.on { background: var(--low); }
 .ep-dot.off { background: var(--muted); }
 .ep-info strong { font-size: 13px; }
-.ep-info small  { display: block; font-size: 11px; color: var(--muted); margin-top: 2px; }
+.ep-info small { display: block; font-size: 11px; color: var(--muted); margin-top: 2px; }
 
 /* ── Threat intel rows ── */
 .ti-row {
   display: flex; justify-content: space-between; align-items: center;
-  padding: 11px 18px;
-  border-bottom: 1px solid rgba(30,38,64,.6);
+  padding: 11px 18px; border-bottom: 1px solid rgba(30,38,64,.6);
 }
 .ti-row:last-child { border-bottom: none; }
 .ti-label { font-size: 12px; color: var(--muted); }
-.ti-val   { font-size: 13px; font-weight: 600; }
+.ti-val { font-size: 13px; font-weight: 600; }
+.ti-ips-toggle { background: none; border: none; color: var(--accent); font-size: 11px; cursor: pointer; padding: 0; }
+.ti-ips-list { padding: 10px 18px 14px; border-top: 1px solid var(--border); }
+.ti-ip { font-family: 'SF Mono','Consolas',monospace; font-size: 11px; color: #f87171; line-height: 2; display: block; }
+
+/* ── Resolvable IPs ── */
+.rip {
+  cursor: pointer;
+  border-bottom: 1px dashed rgba(148,163,184,.35);
+  transition: border-color .12s;
+}
+.rip:hover { border-bottom-color: #94a3b8; }
+.rip.bad { border-bottom-color: rgba(248,113,113,.4); }
+.rip.bad:hover { border-bottom-color: #f87171; }
+.rdns {
+  display: block; margin-top: 3px;
+  font-size: 10px; color: var(--muted); font-style: italic;
+}
+.rdns.loading { color: #475569; }
+.rdns.resolved { color: #64748b; }
 
 /* ── Empty state ── */
 .empty { padding: 36px; text-align: center; color: var(--muted); font-size: 12px; line-height: 1.8; }
-
-/* ── Rule name pill ── */
-.rule { font-size: 10px; font-family: monospace; color: var(--muted); }
 
 @media (max-width: 1024px) {
   .cards  { grid-template-columns: repeat(2,1fr); }
@@ -231,22 +254,33 @@ tr:hover td { background: rgba(59,130,246,.04); }
   <!-- ── Main layout ── -->
   <div class="layout">
 
-    <!-- ── Alerts ── -->
+    <!-- ── Left: Alerts + Top Talkers ── -->
     <div>
       <div class="panel">
+        <!-- Tab bar -->
         <div class="panel-head">
-          <span class="panel-title">Security Alerts</span>
-          <span class="count-badge" id="alert-count">0</span>
+          <div class="tab-bar">
+            <button class="ptab on" data-tab="alerts">Security Alerts</button>
+            <button class="ptab"    data-tab="talkers">Top Talkers</button>
+          </div>
+          <span class="count-badge" id="main-count">0</span>
         </div>
-        <div class="filters">
-          <button class="flt on"  data-f="all">All</button>
-          <button class="flt" data-f="critical">Critical</button>
-          <button class="flt" data-f="high">High</button>
-          <button class="flt" data-f="medium">Medium</button>
-          <button class="flt" data-f="low">Low</button>
+
+        <!-- Alerts: filter bar + content -->
+        <div id="tab-alerts">
+          <div class="filters">
+            <button class="flt on" data-f="all">All</button>
+            <button class="flt" data-f="critical">Critical</button>
+            <button class="flt" data-f="high">High</button>
+            <button class="flt" data-f="medium">Medium</button>
+            <button class="flt" data-f="low">Low</button>
+          </div>
+          <div id="alerts-body"><div class="empty">Loading…</div></div>
         </div>
-        <div id="alerts-body">
-          <div class="empty">Loading alerts…</div>
+
+        <!-- Top Talkers content (hidden initially) -->
+        <div id="tab-talkers" style="display:none">
+          <div id="talkers-body"><div class="empty">Loading…</div></div>
         </div>
       </div>
     </div>
@@ -268,9 +302,8 @@ tr:hover td { background: rgba(59,130,246,.04); }
           <span class="panel-title">Threat Intelligence</span>
           <button class="ack" onclick="refreshTI()" style="font-size:10px">Refresh</button>
         </div>
-        <div id="ti-body">
-          <div class="empty">Loading…</div>
-        </div>
+        <div id="ti-body"><div class="empty">Loading…</div></div>
+        <div id="ti-ips-list" style="display:none"></div>
       </div>
     </div>
 
@@ -280,7 +313,10 @@ tr:hover td { background: rgba(59,130,246,.04); }
 <script>
 const KEY = '__API_KEY__';
 let allAlerts = [];
+let allTalkers = [];
 let curFilter = 'all';
+let curTab = 'alerts';
+let tiIpsVisible = false;
 
 async function api(path, opts) {
   const r = await fetch(path, { headers: {'x-api-key': KEY}, ...opts });
@@ -305,7 +341,28 @@ function badge(sev) {
   return `<span class="badge b-${sev||'info'}">${sev||'info'}</span>`;
 }
 
-// ── Filter buttons ────────────────────────────────────────────
+// ── Tab switching ─────────────────────────────────────────────
+document.querySelectorAll('.ptab').forEach(btn => {
+  btn.addEventListener('click', () => {
+    curTab = btn.dataset.tab;
+    document.querySelectorAll('.ptab').forEach(b => b.classList.remove('on'));
+    btn.classList.add('on');
+    document.getElementById('tab-alerts').style.display  = curTab === 'alerts'  ? '' : 'none';
+    document.getElementById('tab-talkers').style.display = curTab === 'talkers' ? '' : 'none';
+    updateMainCount();
+  });
+});
+
+function updateMainCount() {
+  if (curTab === 'alerts') {
+    const f = curFilter === 'all' ? allAlerts : allAlerts.filter(a => a.severity === curFilter);
+    document.getElementById('main-count').textContent = f.length;
+  } else {
+    document.getElementById('main-count').textContent = allTalkers.length;
+  }
+}
+
+// ── Alert filter buttons ──────────────────────────────────────
 document.querySelectorAll('.flt').forEach(btn => {
   btn.addEventListener('click', () => {
     document.querySelectorAll('.flt').forEach(b => b.classList.remove('on'));
@@ -315,9 +372,10 @@ document.querySelectorAll('.flt').forEach(btn => {
   });
 });
 
+// ── Render: Alerts ────────────────────────────────────────────
 function renderAlerts() {
   const filtered = curFilter === 'all' ? allAlerts : allAlerts.filter(a => a.severity === curFilter);
-  document.getElementById('alert-count').textContent = filtered.length;
+  updateMainCount();
   const el = document.getElementById('alerts-body');
 
   if (!filtered.length) {
@@ -347,6 +405,49 @@ function renderAlerts() {
   </table>`;
 }
 
+// ── Render: Top Talkers ───────────────────────────────────────
+function renderTalkers() {
+  updateMainCount();
+  const el = document.getElementById('talkers-body');
+
+  if (!allTalkers.length) {
+    el.innerHTML = '<div class="empty">No external connections recorded yet.<br>Start the agent to begin monitoring.</div>';
+    return;
+  }
+
+  const maxCount = allTalkers[0]?.count || 1;
+
+  const rows = allTalkers.map(t => {
+    const barPct = Math.round((t.count / maxCount) * 100);
+    const isBad = t.is_malicious;
+    const tags = t => t.map(v => `<span class="tag">${esc(v)}</span>`).join('');
+
+    return `<tr>
+      <td>
+        <span class="talker-ip ${isBad?'bad':''}">${esc(t.ip)}</span>
+        ${isBad ? '<span class="malicious-tag">C2</span>' : ''}
+        <div class="tag-list">${tags(t.processes)}</div>
+      </td>
+      <td>
+        <div class="conn-count">${t.count.toLocaleString()}</div>
+        <div class="conn-bar-wrap"><div class="conn-bar ${isBad?'bad':''}" style="width:${barPct}%"></div></div>
+      </td>
+      <td><div class="tag-list">${tags(t.endpoints)}</div></td>
+      <td><div class="tag-list">${tags(t.ports.map(p => ':'+p))}</div></td>
+      <td class="t-muted">${ago(t.last_seen)}</td>
+    </tr>`;
+  }).join('');
+
+  el.innerHTML = `<table>
+    <thead><tr>
+      <th>Remote IP · Process</th><th>Connections</th>
+      <th>Endpoints</th><th>Ports</th><th>Last Seen</th>
+    </tr></thead>
+    <tbody>${rows}</tbody>
+  </table>`;
+}
+
+// ── Render: Endpoints ─────────────────────────────────────────
 function renderEndpoints(eps) {
   document.getElementById('ep-count').textContent = eps.length;
   const el = document.getElementById('ep-body');
@@ -365,19 +466,59 @@ function renderEndpoints(eps) {
     </div>`).join('');
 }
 
+// ── Render: Threat Intel ──────────────────────────────────────
 function renderTI(ti) {
   if (!ti) return;
+  const ipCount = ti.malicious_ips || 0;
   document.getElementById('ti-body').innerHTML = `
-    <div class="ti-row"><span class="ti-label">Malicious IPs</span>
-      <span class="ti-val">${(ti.malicious_ips||0).toLocaleString()}</span></div>
+    <div class="ti-row">
+      <span class="ti-label">Malicious IPs</span>
+      <span class="ti-val">
+        ${ipCount.toLocaleString()}
+        ${ipCount > 0 ? `<button class="ti-ips-toggle" onclick="toggleIPs()" id="ips-btn">Show ▾</button>` : ''}
+      </span>
+    </div>
     <div class="ti-row"><span class="ti-label">Malicious Domains</span>
       <span class="ti-val">${(ti.malicious_domains||0).toLocaleString()}</span></div>
     <div class="ti-row"><span class="ti-label">Last Updated</span>
       <span class="ti-val">${ago(ti.last_refresh)}</span></div>
     <div class="ti-row"><span class="ti-label">Sources</span>
       <span class="ti-val" style="font-size:11px;color:var(--muted)">Feodo Tracker · URLhaus</span></div>`;
+
+  // Keep the IPs list visible state if it was open
+  if (tiIpsVisible) loadAndShowIPs();
 }
 
+async function toggleIPs() {
+  tiIpsVisible = !tiIpsVisible;
+  const listEl = document.getElementById('ti-ips-list');
+  const btn = document.getElementById('ips-btn');
+  if (!tiIpsVisible) {
+    listEl.style.display = 'none';
+    if (btn) btn.textContent = 'Show ▾';
+    return;
+  }
+  await loadAndShowIPs();
+}
+
+async function loadAndShowIPs() {
+  const listEl = document.getElementById('ti-ips-list');
+  const btn = document.getElementById('ips-btn');
+  try {
+    const ips = await api('/api/threat-intel/ips');
+    listEl.innerHTML = `<div class="ti-ips-list">
+      <div style="font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.8px;margin-bottom:6px">Known C2 IPs (Feodo Tracker)</div>
+      ${ips.map(ip => `<span class="ti-ip">${esc(ip)}</span>`).join('')}
+    </div>`;
+    listEl.style.display = '';
+    if (btn) btn.textContent = 'Hide ▴';
+  } catch(e) {
+    listEl.innerHTML = '<div class="empty" style="padding:12px">Could not load IPs</div>';
+    listEl.style.display = '';
+  }
+}
+
+// ── Actions ───────────────────────────────────────────────────
 async function ack(id) {
   await api(`/api/alerts/${id}/acknowledge`, {method:'PUT'});
   await refresh();
@@ -385,15 +526,19 @@ async function ack(id) {
 
 async function refreshTI() {
   await api('/api/threat-intel/refresh', {method:'POST'});
+  tiIpsVisible = false;
+  document.getElementById('ti-ips-list').style.display = 'none';
   await refresh();
 }
 
+// ── Main refresh ──────────────────────────────────────────────
 async function refresh() {
   try {
-    const [dash, alerts, eps] = await Promise.all([
+    const [dash, alerts, eps, talkers] = await Promise.all([
       api('/api/dashboard'),
       api('/api/alerts'),
       api('/api/endpoints'),
+      api('/api/top-talkers'),
     ]);
 
     const na = dash.alerts_24h;
@@ -408,8 +553,11 @@ async function refresh() {
     document.getElementById('s-ep-sub').textContent = `of ${dash.total_endpoints} total`;
     document.getElementById('s-events').textContent = (dash.events_24h||0).toLocaleString();
 
-    allAlerts = alerts;
+    allAlerts  = alerts;
+    allTalkers = talkers;
+
     renderAlerts();
+    renderTalkers();
     renderEndpoints(eps);
     renderTI(dash.threat_intel);
 
