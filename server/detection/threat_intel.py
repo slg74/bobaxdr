@@ -33,14 +33,23 @@ class ThreatIntel:
             "nanominer", "rigel", "bminer", "excavator", "trex", "minero",
         }
 
-        # Spectrum DNS servers + common public DNS
+        # Spectrum DNS servers + common public DNS (exact IPs)
         self.trusted_dns: Set[str] = {
-            "75.75.75.75", "75.75.76.76",   # Spectrum
-            "8.8.8.8", "8.8.4.4",           # Google
-            "1.1.1.1", "1.0.0.1",           # Cloudflare
-            "9.9.9.9", "149.112.112.112",   # Quad9
+            "75.75.75.75", "75.75.76.76",        # Spectrum
+            "8.8.8.8", "8.8.4.4",               # Google public DNS
+            "1.1.1.1", "1.0.0.1",               # Cloudflare
+            "9.9.9.9", "149.112.112.112",        # Quad9
             "208.67.222.222", "208.67.220.220",  # OpenDNS
         }
+        # Trusted network prefixes — browsers use DNS-over-HTTPS through these
+        # ranges rather than the well-known resolver IPs above
+        self.trusted_dns_prefixes: tuple = (
+            "142.250.", "142.251.",  # Google (DoH via Chrome/browsers)
+            "172.217.",              # Google
+            "216.58.",               # Google
+            "104.16.", "104.17.",    # Cloudflare CDN (DoH)
+            "17.",                   # Apple (macOS private relay / DoH)
+        )
 
     async def refresh(self):
         if self.last_refresh and datetime.utcnow() - self.last_refresh < self._refresh_interval:
@@ -99,7 +108,7 @@ class ThreatIntel:
         return port in self.mining_ports
 
     def is_trusted_dns(self, ip: str) -> bool:
-        return ip in self.trusted_dns
+        return ip in self.trusted_dns or any(ip.startswith(p) for p in self.trusted_dns_prefixes)
 
     def status(self) -> dict:
         return {

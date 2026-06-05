@@ -205,6 +205,20 @@ async def ack_alert(alert_id: int, db: Session = Depends(get_db), _=Depends(auth
     return {"status": "ok"}
 
 
+@app.post("/api/alerts/acknowledge-all")
+async def ack_all_alerts(
+    severity: Optional[str] = None,
+    db: Session = Depends(get_db),
+    _=Depends(auth),
+):
+    q = db.query(Alert).filter(Alert.acknowledged == False)
+    if severity:
+        q = q.filter(Alert.severity == severity)
+    n = q.update({"acknowledged": True})
+    db.commit()
+    return {"acknowledged": n}
+
+
 @app.delete("/api/alerts/acknowledged")
 async def clear_acknowledged(db: Session = Depends(get_db), _=Depends(auth)):
     n = db.query(Alert).filter(Alert.acknowledged == True).delete()

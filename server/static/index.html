@@ -319,6 +319,7 @@ tr:hover td { background: rgba(59,130,246,.04); }
             <button class="flt" data-f="high">High</button>
             <button class="flt" data-f="medium">Medium</button>
             <button class="flt" data-f="low">Low</button>
+            <button class="ack" onclick="ackAll()" style="margin-left:auto">Ack All</button>
           </div>
           <div id="alerts-body"><div class="empty">Loading…</div></div>
         </div>
@@ -625,6 +626,12 @@ async function resolveIP(ip, uid) {
 // ── Actions ───────────────────────────────────────────────────
 async function ack(id) {
   await api(`/api/alerts/${id}/acknowledge`, {method:'PUT'});
+  await refresh();
+}
+
+async function ackAll() {
+  const sev = curFilter === 'all' ? '' : `?severity=${curFilter}`;
+  const res = await api(`/api/alerts/acknowledge-all${sev}`, {method:'POST'});
   await refresh();
 }
 
