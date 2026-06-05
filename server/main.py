@@ -20,7 +20,7 @@ from sqlalchemy.orm import Session
 sys.path.insert(0, os.path.dirname(__file__))
 
 from database import get_db, engine, Base
-from models import Endpoint, Event, Alert
+from models import Endpoint, Event, Alert, NetworkDevice
 from detection.engine import DetectionEngine
 from detection.threat_intel import ThreatIntel
 
@@ -176,6 +176,9 @@ async def ingest_event(
     if data.get("type") == "network_connections":
         talkers.record(data.get("connections", []), hostname)
 
+    if data.get("type") == "network_scan":
+        background_tasks.add_task(_process_network_scan, data.get("devices", []))
+
     background_tasks.add_task(engine_.run_detection, data, ep.id)
     return {"status": "ok", "event_id": ev.id}
 
@@ -328,6 +331,68 @@ async def dashboard_stats(db: Session = Depends(get_db), _=Depends(auth)):
     }
 
 
+# ── Network scan processor ────────────────────────────────────────────────────
+def _process_network_scan(devices: list):
+    from database import SessionLocal
+    db = SessionLocal()
+    try:
+        for d in devices:
+            ip = d.get("ip", "")
+            if not ip:
+                continue
+            existing = db.query(NetworkDevice).filter(NetworkDevice.ip == ip).first()
+            if not existing:
+                new_dev = NetworkDevice(
+                    ip=ip,
+                    mac=d.get("mac", ""),
+                    hostname=d.get("hostname", ""),
+                    first_seen=datetime.utcnow(),
+                    last_seen=datetime.utcnow(),
+                )
+                db.add(new_dev)
+                db.flush()
+                # Alert on new unknown device
+                alert = Alert(
+                    endpoint_hostname="network",
+                    rule_name="NEW_NETWORK_DEVICE",
+                    severity="medium",
+                    title=f"New device joined the network",
+                    description=f"Unknown device appeared at {ip} "
+                                f"(MAC: {d.get('mac', 'unknown')}, "
+                                f"hostname: {d.get('hostname', 'unknown')})",
+                    indicator=ip,
+                    timestamp=datetime.utcnow(),
+                )
+                db.add(alert)
+                logger.warning(f"[NEW DEVICE] {ip}  mac={d.get('mac')}  host={d.get('hostname')}")
+            else:
+                # Detect MAC change — possible ARP spoofing
+                old_mac = existing.mac
+                new_mac = d.get("mac", "")
+                if old_mac and new_mac and old_mac != new_mac:
+                    alert = Alert(
+                        endpoint_hostname="network",
+                        rule_name="ARP_SPOOF_SUSPECTED",
+                        severity="high",
+                        title=f"ARP spoofing suspected — MAC changed for {ip}",
+                        description=f"{ip} was {old_mac}, now answering as {new_mac}",
+                        indicator=ip,
+                        timestamp=datetime.utcnow(),
+                    )
+                    db.add(alert)
+                    logger.warning(f"[ARP SPOOF] {ip} mac changed {old_mac} → {new_mac}")
+                existing.last_seen = datetime.utcnow()
+                if d.get("mac"):
+                    existing.mac = d["mac"]
+                if d.get("hostname"):
+                    existing.hostname = d["hostname"]
+        db.commit()
+    except Exception:
+        logger.exception("Network scan processing error")
+    finally:
+        db.close()
+
+
 # ── Top Talkers ───────────────────────────────────────────────────────────────
 @app.get("/api/top-talkers")
 async def top_talkers(limit: int = 30, _=Depends(auth)):
@@ -350,6 +415,23 @@ async def ti_refresh(_=Depends(auth)):
     threat_intel.last_refresh = None
     await threat_intel.refresh()
     return threat_intel.status()
+
+
+# ── Network Devices ───────────────────────────────────────────────────────────
+@app.get("/api/devices")
+async def list_devices(db: Session = Depends(get_db), _=Depends(auth)):
+    devs = db.query(NetworkDevice).order_by(NetworkDevice.last_seen.desc()).all()
+    return [d.to_dict() for d in devs]
+
+
+@app.put("/api/devices/{device_id}/acknowledge")
+async def ack_device(device_id: int, db: Session = Depends(get_db), _=Depends(auth)):
+    d = db.query(NetworkDevice).filter(NetworkDevice.id == device_id).first()
+    if not d:
+        raise HTTPException(status_code=404)
+    d.known = True
+    db.commit()
+    return {"status": "ok"}
 
 
 # ── Reverse DNS ───────────────────────────────────────────────────────────────

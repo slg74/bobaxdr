@@ -202,8 +202,12 @@ def main():
     logger.info(f"BobaxDR sensor — {HOSTNAME}")
     logger.info(f"Reporting to {SERVER}")
 
-    # DNS hijack monitor runs in background regardless of privilege level
+    # DNS hijack monitor + network device scanner run regardless of privilege level
     threading.Thread(target=dns_hijack_monitor, daemon=True, name="dns-hijack").start()
+
+    sys.path.insert(0, os.path.dirname(__file__))
+    import network_scanner
+    network_scanner.start(SERVER, API_KEY, HOSTNAME)
 
     # Use packet capture if root, otherwise fall back to connection monitoring
     try:

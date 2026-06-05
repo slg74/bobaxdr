@@ -1,5 +1,5 @@
 from datetime import datetime, timezone
-from sqlalchemy import Column, Integer, String, DateTime, Text, Boolean, ForeignKey
+from sqlalchemy import Column, Integer, String, DateTime, Text, Boolean, ForeignKey, UniqueConstraint
 from database import Base
 
 
@@ -69,4 +69,27 @@ class Alert(Base):
             "indicator": self.indicator,
             "timestamp": self.timestamp.isoformat() if self.timestamp else None,
             "acknowledged": self.acknowledged,
+        }
+
+
+class NetworkDevice(Base):
+    __tablename__ = "network_devices"
+
+    id = Column(Integer, primary_key=True)
+    ip = Column(String(50), unique=True, index=True)
+    mac = Column(String(50))
+    hostname = Column(String(255))
+    first_seen = Column(DateTime, default=_utcnow)
+    last_seen = Column(DateTime)
+    known = Column(Boolean, default=False)  # user-acknowledged as expected
+
+    def to_dict(self):
+        return {
+            "id": self.id,
+            "ip": self.ip,
+            "mac": self.mac,
+            "hostname": self.hostname,
+            "first_seen": self.first_seen.isoformat() if self.first_seen else None,
+            "last_seen": self.last_seen.isoformat() if self.last_seen else None,
+            "known": self.known,
         }
