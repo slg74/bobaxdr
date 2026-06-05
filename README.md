@@ -54,15 +54,85 @@ On first run an API key is generated and printed. The dashboard opens at **http:
 
 ### 3. Add more devices
 
-Copy the API key from the startup output, then on each additional device:
+Copy the API key printed on first server start (also saved to `.api_key` in the project root), then follow the steps for each platform below.
+
+---
+
+## Installing the Agent
+
+The agent runs on macOS, Windows, and Linux. It reports running processes and active network connections to the server every 10–30 seconds.
+
+### macOS
 
 ```bash
-export BOBAXDR_API_KEY=<key-from-server>
-export BOBAXDR_SERVER=http://<server-mac-ip>:8000
-cd agent && python3 agent.py
+# Copy the three agent files to the target machine
+scp agent/agent.py agent/process_monitor.py agent/network_monitor.py \
+    user@<target-ip>:~/bobaxdr-agent/
+
+# On the target Mac
+cd ~/bobaxdr-agent
+/Library/Frameworks/Python.framework/Versions/3.12/bin/pip3 install psutil requests
+export BOBAXDR_API_KEY=<key>
+export BOBAXDR_SERVER=http://<server-ip>:8000
+/Library/Frameworks/Python.framework/Versions/3.12/bin/python3 agent.py
 ```
 
-The agent works on **macOS, Windows, and Linux** with no changes.
+> Use the full Python 3.12 path — the Xcode-bundled Python 3.9 at `/usr/bin/python3` will not work correctly.
+
+### Linux (Kali, Ubuntu, Debian)
+
+Modern Debian-based distros block system-wide pip installs. Use a virtualenv:
+
+```bash
+# Copy agent files
+scp agent/agent.py agent/process_monitor.py agent/network_monitor.py \
+    user@<target-ip>:~/bobaxdr-agent/
+
+# On the target Linux machine
+cd ~/bobaxdr-agent
+python3 -m venv venv
+source venv/bin/activate
+pip install psutil requests
+
+export BOBAXDR_API_KEY=<key>
+export BOBAXDR_SERVER=http://<server-ip>:8000
+python3 agent.py
+```
+
+To keep the venv active across sessions, add `source ~/bobaxdr-agent/venv/bin/activate` to `~/.bashrc`.
+
+### Windows
+
+```powershell
+# Copy agent files to C:\bobaxdr-agent\ then open PowerShell as Administrator
+cd C:\bobaxdr-agent
+pip install psutil requests
+
+$env:BOBAXDR_API_KEY = "<key>"
+$env:BOBAXDR_SERVER  = "http://<server-ip>:8000"
+python agent.py
+```
+
+For best visibility on Windows, run as Administrator — this allows psutil to see connections from all processes, not just the current user.
+
+### Verify the agent connected
+
+After starting the agent, check the **Endpoints** panel in the dashboard. The device should appear as online within 30 seconds. You can also check from the server machine:
+
+```bash
+curl -s -H "x-api-key: $(cat .api_key)" http://localhost:8000/api/endpoints
+```
+
+### Environment variables
+
+| Variable | Default | Description |
+|---|---|---|
+| `BOBAXDR_API_KEY` | *(required)* | Key printed on first server start, saved to `.api_key` |
+| `BOBAXDR_SERVER` | `http://localhost:8000` | URL of the BobaxDR server |
+| `BOBAXDR_PROC_INTERVAL` | `30` | Seconds between process snapshots |
+| `BOBAXDR_NET_INTERVAL` | `10` | Seconds between network connection snapshots |
+
+---
 
 ### 4. Enable full network sensor (optional, requires sudo)
 
