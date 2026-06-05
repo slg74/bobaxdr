@@ -113,23 +113,36 @@ def scan_arp_cache() -> list[dict]:
 
 
 def run_scan(subnet: str) -> list[dict]:
-    """Run the best available scan method."""
+    """Run all available scan methods and merge results by IP."""
     is_root = os.geteuid() == 0 if hasattr(os, "geteuid") else False
+    merged: dict[str, dict] = {}
 
+    def add(devices):
+        for d in devices:
+            ip = d.get("ip", "")
+            if not ip:
+                continue
+            if ip not in merged:
+                merged[ip] = d
+            else:
+                # Fill in missing fields from additional sources
+                if not merged[ip].get("mac") and d.get("mac"):
+                    merged[ip]["mac"] = d["mac"]
+                if not merged[ip].get("hostname") and d.get("hostname"):
+                    merged[ip]["hostname"] = d["hostname"]
+
+    # Always start with ARP cache — most complete for currently active devices
+    add(scan_arp_cache())
+
+    # Supplement with nmap for devices not yet in cache
+    add(scan_with_nmap(subnet))
+
+    # Full ARP sweep if root
     if is_root:
-        devices = scan_with_scapy(subnet)
-        if devices:
-            logger.info(f"ARP sweep found {len(devices)} devices on {subnet}")
-            return devices
+        add(scan_with_scapy(subnet))
 
-    # Try nmap first, fall back to arp cache
-    devices = scan_with_nmap(subnet)
-    if devices:
-        logger.info(f"nmap found {len(devices)} devices on {subnet}")
-        return devices
-
-    devices = scan_arp_cache()
-    logger.info(f"ARP cache shows {len(devices)} devices")
+    devices = list(merged.values())
+    logger.info(f"Network scan complete: {len(devices)} devices on {subnet}")
     return devices
 
 
