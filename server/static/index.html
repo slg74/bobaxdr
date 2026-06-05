@@ -420,12 +420,15 @@ function renderTalkers() {
   const rows = allTalkers.map(t => {
     const barPct = Math.round((t.count / maxCount) * 100);
     const isBad = t.is_malicious;
-    const tags = t => t.map(v => `<span class="tag">${esc(v)}</span>`).join('');
+    const tags = arr => arr.map(v => `<span class="tag">${esc(v)}</span>`).join('');
+    const uid = 'r-' + t.ip.replace(/[.:]/g, '-');
 
     return `<tr>
       <td>
-        <span class="talker-ip ${isBad?'bad':''}">${esc(t.ip)}</span>
+        <span class="talker-ip ${isBad?'bad':''} rip" onclick="resolveIP('${esc(t.ip)}','${uid}')"
+              title="Click to resolve hostname">${esc(t.ip)}</span>
         ${isBad ? '<span class="malicious-tag">C2</span>' : ''}
+        <span class="rdns" id="${uid}"></span>
         <div class="tag-list">${tags(t.processes)}</div>
       </td>
       <td>
@@ -506,15 +509,51 @@ async function loadAndShowIPs() {
   const btn = document.getElementById('ips-btn');
   try {
     const ips = await api('/api/threat-intel/ips');
+    const items = ips.map(ip => {
+      const uid = 'r-' + ip.replace(/[.:]/g, '-');
+      return `<span class="ti-ip">
+        <span class="rip bad" onclick="resolveIP('${esc(ip)}','${uid}')" title="Click to resolve hostname">${esc(ip)}</span>
+        <span class="rdns" id="${uid}"></span>
+      </span>`;
+    }).join('');
     listEl.innerHTML = `<div class="ti-ips-list">
       <div style="font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.8px;margin-bottom:6px">Known C2 IPs (Feodo Tracker)</div>
-      ${ips.map(ip => `<span class="ti-ip">${esc(ip)}</span>`).join('')}
+      ${items}
     </div>`;
     listEl.style.display = '';
     if (btn) btn.textContent = 'Hide ▴';
   } catch(e) {
     listEl.innerHTML = '<div class="empty" style="padding:12px">Could not load IPs</div>';
     listEl.style.display = '';
+  }
+}
+
+// ── Reverse DNS lookup ────────────────────────────────────────
+const _rdnsCache = {};
+async function resolveIP(ip, uid) {
+  const el = document.getElementById(uid);
+  if (!el) return;
+
+  // Toggle off if already resolved
+  if (el.dataset.state === 'on') {
+    el.textContent = '';
+    el.dataset.state = 'off';
+    return;
+  }
+
+  el.className = 'rdns loading';
+  el.textContent = '↩ resolving…';
+  el.dataset.state = 'on';
+
+  try {
+    const cached = _rdnsCache[ip];
+    const data = cached ?? await api(`/api/resolve/${encodeURIComponent(ip)}`);
+    if (!cached) _rdnsCache[ip] = data;
+    el.className = 'rdns resolved';
+    el.textContent = `↩ ${data.hostname}`;
+  } catch(e) {
+    el.className = 'rdns';
+    el.textContent = '↩ lookup failed';
   }
 }
 

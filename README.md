@@ -118,6 +118,18 @@ Feeds are downloaded on startup and refreshed every 4 hours:
 
 The sensor also maintains a DNS baseline at startup and alerts if a known domain starts resolving to an unexpected IP range (DNS hijack detection).
 
+### What the Feodo C2 IPs actually are
+
+The IPs in the Feodo blocklist are confirmed **botnet command-and-control servers** — machines that infected computers phone home to for instructions. They appear in the dashboard's Threat Intelligence panel as the watchlist. They are **not on your network**; BobaxDR watches for any local device that tries to connect to one and fires a Critical alert if it does.
+
+The blocklist is dominated by two malware families:
+
+**Emotet** — one of the most destructive banking trojans on record. Spreads via malicious email attachments, steals credentials, and is frequently used to drop ransomware. Was largely dismantled by a coordinated law enforcement takedown in 2021 but has resurfaced in waves since.
+
+**QakBot** (QBot / Quakbot) — a banking trojan that steals credentials and browser data and acts as a loader for ransomware (notably Black Basta). The FBI disrupted its infrastructure in August 2023 ("Operation Duck Hunt"), but operators rebuilt and it remains active. QakBot C2s commonly run on port 443 to blend in with normal HTTPS traffic, hosted on cloud providers like AWS and DigitalOcean to avoid IP-based blocking.
+
+The typical C2 hosting pattern — rented VPS nodes on AWS, DigitalOcean, or Sakura Internet, no reverse DNS (PTR) record set — is intentional. Legitimate services almost always configure PTR records; the absence of one on a server receiving regular connections is a red flag. Operators rent these servers cheaply, use them briefly, and abandon them when they get blocked, which is why the Feodo list contains a mix of `online` and `offline` entries.
+
 ---
 
 ## Configuration
