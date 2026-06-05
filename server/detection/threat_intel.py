@@ -1,6 +1,7 @@
 import asyncio
 import logging
 import ssl
+import ipaddress
 import aiohttp
 import certifi
 from datetime import datetime, timedelta
@@ -41,19 +42,25 @@ class ThreatIntel:
             "9.9.9.9", "149.112.112.112",        # Quad9
             "208.67.222.222", "208.67.220.220",  # OpenDNS
         }
-        # Trusted network prefixes — browsers use DNS-over-HTTPS through these
-        # ranges rather than the well-known resolver IPs above
-        self.trusted_dns_prefixes: tuple = (
-            "142.250.", "142.251.",  # Google (DoH via Chrome/browsers)
-            "172.217.", "172.253.", # Google
-            "173.194.",             # Google
-            "192.178.",             # Google
-            "216.58.",              # Google
-            "104.16.", "104.17.",   # Cloudflare CDN (DoH)
-            "17.",                  # Apple (macOS private relay / DoH)
-            "98.87.",               # Amazon DNS / AWS infrastructure
-            "52.", "54.",           # AWS broad ranges (used for DNS/CDN)
-        )
+        # Trusted CIDR ranges — browsers use DNS-over-HTTPS across these,
+        # so any DNS traffic to these networks is expected and not suspicious.
+        self._trusted_networks = [
+            ipaddress.ip_network(n) for n in [
+                "142.250.0.0/15",   # Google (Chrome DoH, 1e100.net)
+                "172.217.0.0/16",   # Google
+                "172.253.0.0/16",   # Google
+                "173.194.0.0/16",   # Google
+                "192.178.0.0/15",   # Google
+                "216.58.192.0/19",  # Google
+                "104.16.0.0/13",    # Cloudflare CDN / DoH
+                "17.0.0.0/8",       # Apple (Private Relay, DoH)
+                "98.80.0.0/12",     # Amazon (covers 98.80–98.95)
+                "52.0.0.0/8",       # Amazon AWS
+                "54.0.0.0/8",       # Amazon AWS
+                "3.0.0.0/8",        # Amazon AWS
+                "13.32.0.0/12",     # Amazon CloudFront
+            ]
+        ]
 
     async def refresh(self):
         if self.last_refresh and datetime.utcnow() - self.last_refresh < self._refresh_interval:
@@ -112,7 +119,13 @@ class ThreatIntel:
         return port in self.mining_ports
 
     def is_trusted_dns(self, ip: str) -> bool:
-        return ip in self.trusted_dns or any(ip.startswith(p) for p in self.trusted_dns_prefixes)
+        if ip in self.trusted_dns:
+            return True
+        try:
+            addr = ipaddress.ip_address(ip)
+            return any(addr in net for net in self._trusted_networks)
+        except ValueError:
+            return False
 
     def status(self) -> dict:
         return {
