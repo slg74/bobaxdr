@@ -45,10 +45,14 @@ class ThreatIntel:
         # ranges rather than the well-known resolver IPs above
         self.trusted_dns_prefixes: tuple = (
             "142.250.", "142.251.",  # Google (DoH via Chrome/browsers)
-            "172.217.",              # Google
-            "216.58.",               # Google
-            "104.16.", "104.17.",    # Cloudflare CDN (DoH)
-            "17.",                   # Apple (macOS private relay / DoH)
+            "172.217.", "172.253.", # Google
+            "173.194.",             # Google
+            "192.178.",             # Google
+            "216.58.",              # Google
+            "104.16.", "104.17.",   # Cloudflare CDN (DoH)
+            "17.",                  # Apple (macOS private relay / DoH)
+            "98.87.",               # Amazon DNS / AWS infrastructure
+            "52.", "54.",           # AWS broad ranges (used for DNS/CDN)
         )
 
     async def refresh(self):
