@@ -11,6 +11,7 @@ from detection.threat_intel import ThreatIntel
 logger = logging.getLogger(__name__)
 
 # Processes that legitimately make many connections — suppress false positives
+# Comparison is lowercased, so "Google" matches "google" etc.
 BENIGN_PROCESSES = {
     "chrome", "firefox", "safari", "msedge", "opera", "brave", "arc",
     "slack", "zoom", "teams", "discord", "spotify", "steam",
@@ -18,6 +19,10 @@ BENIGN_PROCESSES = {
     "softwareupdate", "com.apple.trustd", "com.apple.security",
     "system", "svchost", "lsass", "services", "wininit",
     "node", "java", "python", "python3",
+    # Google background processes (updater / Keystone, keepalive to GitHub etc.)
+    "google", "googleupdate", "googlecrashhandler", "keystone",
+    # Steam — high connection volume to CDN/matchmaking/presence servers; not a C2 vector
+    "steam", "steam_osx", "steamwebhelper",
 }
 
 SUSPICIOUS_PATHS = [
@@ -130,10 +135,11 @@ class DetectionEngine:
                             f"'{proc}' connected to threat-intel flagged IP {dst_ip}:{dst_port}",
                             dst_ip)
 
-            # Beaconing detection
-            key = (hostname, dst_ip, proc)
-            self._beacon[key].append(now)
-            self._check_beaconing(db, endpoint_id, hostname, key, dst_ip, proc)
+            # Beaconing detection — skip known-benign processes
+            if proc.lower() not in BENIGN_PROCESSES:
+                key = (hostname, dst_ip, proc)
+                self._beacon[key].append(now)
+                self._check_beaconing(db, endpoint_id, hostname, key, dst_ip, proc)
 
             if proc.lower() not in BENIGN_PROCESSES:
                 proc_dst[proc].add((dst_ip, dst_port))

@@ -218,6 +218,71 @@ async def list_endpoints(db: Session = Depends(get_db), _=Depends(auth)):
     return [e.to_dict() for e in db.query(Endpoint).all()]
 
 
+# ── Latest snapshots (for the Events card modal) ──────────────────────────────
+@app.get("/api/events/latest")
+async def latest_snapshots(db: Session = Depends(get_db), _=Depends(auth)):
+    import ast
+
+    def parse(ev):
+        try:
+            return ast.literal_eval(ev.data)
+        except Exception:
+            return {}
+
+    result = []
+    # One latest snapshot of each type per endpoint
+    endpoints = db.query(Endpoint).all()
+    for ep in endpoints:
+        for etype in ("process_snapshot", "network_connections"):
+            ev = (
+                db.query(Event)
+                .filter(Event.endpoint_id == ep.id, Event.event_type == etype)
+                .order_by(Event.timestamp.desc())
+                .first()
+            )
+            if not ev:
+                continue
+            data = parse(ev)
+            if etype == "process_snapshot":
+                procs = data.get("processes", [])
+                # Top 25 by CPU, filter out zero-everything idle entries
+                top = sorted(procs, key=lambda p: p.get("cpu_percent", 0), reverse=True)[:25]
+                result.append({
+                    "type": "process_snapshot",
+                    "hostname": ep.hostname,
+                    "timestamp": ev.timestamp.isoformat(),
+                    "processes": [
+                        {
+                            "name": p.get("name", ""),
+                            "pid": p.get("pid"),
+                            "cpu": p.get("cpu_percent", 0),
+                            "mem": p.get("memory_percent", 0),
+                            "exe": p.get("exe", ""),
+                            "connections": len(p.get("connections", [])),
+                        }
+                        for p in top
+                    ],
+                })
+            else:
+                conns = data.get("connections", [])
+                external = [
+                    c for c in conns
+                    if c.get("raddr") and not any(
+                        c["raddr"].startswith(p)
+                        for p in ("127.", "192.168.", "10.", "::1", "169.")
+                    )
+                ]
+                result.append({
+                    "type": "network_connections",
+                    "hostname": ep.hostname,
+                    "timestamp": ev.timestamp.isoformat(),
+                    "connections": external,
+                    "total": len(conns),
+                })
+
+    return result
+
+
 # ── Dashboard stats ───────────────────────────────────────────────────────────
 @app.get("/api/dashboard")
 async def dashboard_stats(db: Session = Depends(get_db), _=Depends(auth)):
