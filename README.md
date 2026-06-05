@@ -1,1 +1,157 @@
-# bobaxdr
+# BobaxDR — Home XDR
+
+A home-use Extended Detection and Response (XDR) system. Monitors endpoint processes and network connections across your home network, detects threats in real time, and presents findings in a live security dashboard.
+
+Built for Spectrum internet. Inspired by Palo Alto Cortex XDR.
+
+---
+
+## Architecture
+
+```
+bobaxdr/
+├── server/                  # Central server (run on always-on Mac)
+│   ├── main.py              # FastAPI app, event ingestion, REST API
+│   ├── database.py          # SQLite via SQLAlchemy
+│   ├── models.py            # Endpoint, Event, Alert models
+│   ├── detection/
+│   │   ├── engine.py        # Detection rule engine
+│   │   └── threat_intel.py  # Live threat feed downloader
+│   └── static/
+│       └── index.html       # Dark-mode dashboard UI
+├── agent/                   # Endpoint agent (runs on every device)
+│   ├── agent.py             # Main loop — collects and reports data
+│   ├── process_monitor.py   # Running processes via psutil
+│   └── network_monitor.py   # Active connections per process
+├── sensor/
+│   └── sensor.py            # Network sensor (packet capture or fallback)
+├── install.sh               # Dependency installer
+├── start.sh                 # Start server + local agent together
+├── requirements-server.txt
+├── requirements-agent.txt
+└── requirements-sensor.txt
+```
+
+---
+
+## Quick Start
+
+### 1. Install
+
+```bash
+bash install.sh
+```
+
+### 2. Start the server + local agent
+
+```bash
+bash start.sh
+```
+
+On first run an API key is generated and printed. The dashboard opens at **http://localhost:8000**.
+
+### 3. Add more devices
+
+Copy the API key from the startup output, then on each additional device:
+
+```bash
+export BOBAXDR_API_KEY=<key-from-server>
+export BOBAXDR_SERVER=http://<server-mac-ip>:8000
+cd agent && python3 agent.py
+```
+
+The agent works on **macOS, Windows, and Linux** with no changes.
+
+### 4. Enable full network sensor (optional, requires sudo)
+
+For DNS query monitoring and inbound port scan detection via packet capture:
+
+```bash
+sudo BOBAXDR_API_KEY=$BOBAXDR_API_KEY \
+     BOBAXDR_SERVER=$BOBAXDR_SERVER \
+     python3 sensor/sensor.py
+```
+
+Without sudo the sensor falls back to connection-level monitoring and still does DNS hijack detection.
+
+---
+
+## Dashboard
+
+The web dashboard at **http://localhost:8000** shows:
+
+- **Active alerts** with severity badges (Critical / High / Medium / Low)
+- **Endpoint status** — online/offline, platform, IP, last seen
+- **Threat intelligence status** — how many malicious IPs and domains are loaded
+- Filter alerts by severity; acknowledge and clear resolved findings
+- Auto-refreshes every 15 seconds
+
+---
+
+## Detection Rules
+
+| Rule | Severity | How it fires |
+|---|---|---|
+| `CRYPTO_MINER` | Critical | Process name matches xmrig, cgminer, lolminer, and 20+ known miners |
+| `CRYPTO_MINER_HEURISTIC` | High | Process using >85% CPU while connected to a mining pool port |
+| `MALICIOUS_IP_CONNECTION` | Critical | Outbound connection to a Feodo Tracker C2 IP |
+| `MALICIOUS_DOMAIN_DNS` | High | DNS query for a domain in the URLhaus blocklist |
+| `C2_BEACONING` | High | Process connecting to the same external IP at statistically regular intervals |
+| `PORT_SCAN_INBOUND` | High | 10+ TCP SYN packets from the same external IP to different ports within 60s |
+| `PORT_SCAN_OUTBOUND` | Medium | A single process hitting 20+ unique external targets in one reporting interval |
+| `DNS_TUNNELING` | Medium | DNS query sent to a non-standard port (not 53 / 853 / 5353) |
+| `SUSPICIOUS_DNS_SERVER` | Medium | DNS routed to an unrecognized external server (not Spectrum 75.75.75.75/76, Google, Cloudflare, etc.) |
+| `SUSPICIOUS_PROCESS_PATH` | High | Executable running from /tmp, Downloads, AppData Temp, or /dev/shm |
+
+Alerts are deduplicated — the same rule + indicator on the same endpoint won't re-fire within 10 minutes.
+
+---
+
+## Threat Intelligence
+
+Feeds are downloaded on startup and refreshed every 4 hours:
+
+| Feed | Source | Content |
+|---|---|---|
+| Feodo Tracker | abuse.ch | Known botnet C2 IP addresses |
+| URLhaus | abuse.ch | Malicious domains and URLs |
+
+The sensor also maintains a DNS baseline at startup and alerts if a known domain starts resolving to an unexpected IP range (DNS hijack detection).
+
+---
+
+## Configuration
+
+All settings are via environment variables:
+
+### Server
+
+| Variable | Default | Description |
+|---|---|---|
+| `BOBAXDR_DB` | `bobaxdr.db` | Path to the SQLite database |
+
+### Agent
+
+| Variable | Default | Description |
+|---|---|---|
+| `BOBAXDR_SERVER` | `http://localhost:8000` | Server URL |
+| `BOBAXDR_API_KEY` | *(required)* | API key from server startup |
+| `BOBAXDR_PROC_INTERVAL` | `30` | Seconds between process snapshots |
+| `BOBAXDR_NET_INTERVAL` | `10` | Seconds between network connection snapshots |
+
+The API key is auto-generated on first server start and saved to `.api_key` in the project root.
+
+---
+
+## Requirements
+
+**Python 3.10+** on all components.
+
+On macOS, use the full python.org Python 3.12 install rather than the Xcode bundled Python:
+```bash
+/Library/Frameworks/Python.framework/Versions/3.12/bin/python3
+```
+
+**Server:** `fastapi uvicorn sqlalchemy aiohttp certifi`  
+**Agent:** `psutil requests`  
+**Sensor:** `scapy psutil requests dnspython` (scapy optional — fallback runs without it)
