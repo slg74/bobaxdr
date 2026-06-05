@@ -4,6 +4,8 @@ A home-use Extended Detection and Response (XDR) system. Monitors endpoint proce
 
 Built for Spectrum internet. Inspired by Palo Alto Cortex XDR.
 
+![BobaxDR Dashboard](bobaxdr_ss.png)
+
 ---
 
 ## Architecture
@@ -167,3 +169,76 @@ On macOS, use the full python.org Python 3.12 install rather than the Xcode bund
 **Server:** `fastapi uvicorn sqlalchemy aiohttp certifi`  
 **Agent:** `psutil requests`  
 **Sensor:** `scapy psutil requests dnspython` (scapy optional — fallback runs without it)
+
+---
+
+## How to Block an IP (macOS)
+
+If BobaxDR fires a **Critical** alert for a `MALICIOUS_IP_CONNECTION` and you've confirmed it's not a false positive, block the IP using macOS's built-in `pf` packet filter.
+
+### Temporary block (until reboot)
+
+```bash
+echo "block drop quick from any to <IP>" | sudo pfctl -ef -
+```
+
+### Permanent block
+
+1. Open `/etc/pf.conf` in a text editor (requires sudo):
+
+```bash
+sudo nano /etc/pf.conf
+```
+
+2. Add this line near the top, after any existing `block` rules:
+
+```
+block drop quick from any to <IP>
+```
+
+3. Reload the ruleset:
+
+```bash
+sudo pfctl -f /etc/pf.conf
+sudo pfctl -e   # enable pf if it isn't already running
+```
+
+4. Verify the rule is active:
+
+```bash
+sudo pfctl -sr | grep <IP>
+```
+
+### Block multiple IPs with a table (cleaner for a list)
+
+```bash
+# Create a persistent blocklist file
+sudo nano /etc/pf-blocklist.conf
+```
+
+Add one IP per line:
+```
+1.2.3.4
+5.6.7.8
+```
+
+Then in `/etc/pf.conf`, add:
+```
+table <blocklist> persist file "/etc/pf-blocklist.conf"
+block drop quick from any to <blocklist>
+block drop quick from <blocklist> to any
+```
+
+Reload with `sudo pfctl -f /etc/pf.conf`. To add new IPs later without a full reload:
+```bash
+sudo pfctl -t blocklist -T add <IP>
+```
+
+### Before you block
+
+Check whether the alert is a false positive first:
+- Click the IP in the **Top Talkers** tab to resolve it — legitimate services (Microsoft, Google, Apple, GitHub) almost always have a PTR record
+- Check which process is making the connection in the **Events Processed** modal
+- Well-known vendor clouds (Azure `20.x`, AWS `34.x`/`52.x`, Google `142.250.x`) are usually benign even without a PTR record
+
+Real indicators worth blocking: unknown process + no PTR record + IP in Feodo/URLhaus blocklist + port 4444/8080/9001.

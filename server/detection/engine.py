@@ -23,7 +23,18 @@ BENIGN_PROCESSES = {
     "google", "googleupdate", "googlecrashhandler", "keystone",
     # Steam — high connection volume to CDN/matchmaking/presence servers; not a C2 vector
     "steam", "steam_osx", "steamwebhelper",
+    # VS Code — helper processes beacon to Azure for telemetry/extension sync
+    "code", "code helper", "code h",
 }
+
+
+def _is_benign(proc: str) -> bool:
+    """True if the process name matches a known-benign entry.
+    Handles both exact matches and prefix matches for truncated lsof names."""
+    p = proc.lower()
+    if p in BENIGN_PROCESSES:
+        return True
+    return any(p.startswith(b) for b in BENIGN_PROCESSES)
 
 SUSPICIOUS_PATHS = [
     "/tmp/", "/var/tmp/", "/private/tmp/", "/dev/shm/",
@@ -107,7 +118,7 @@ class DetectionEngine:
                         break
 
             # High CPU + connection to mining port = heuristic miner
-            if cpu > 85 and name.lower() not in BENIGN_PROCESSES:
+            if cpu > 85 and not _is_benign(name):
                 for conn in p.get("connections", []):
                     if self.ti.is_mining_port(conn.get("rport", 0)):
                         self._alert(db, endpoint_id, hostname, "CRYPTO_MINER_HEURISTIC", "high",
@@ -135,13 +146,11 @@ class DetectionEngine:
                             f"'{proc}' connected to threat-intel flagged IP {dst_ip}:{dst_port}",
                             dst_ip)
 
-            # Beaconing detection — skip known-benign processes
-            if proc.lower() not in BENIGN_PROCESSES:
+            # Beaconing + scan detection — skip known-benign processes
+            if not _is_benign(proc):
                 key = (hostname, dst_ip, proc)
                 self._beacon[key].append(now)
                 self._check_beaconing(db, endpoint_id, hostname, key, dst_ip, proc)
-
-            if proc.lower() not in BENIGN_PROCESSES:
                 proc_dst[proc].add((dst_ip, dst_port))
 
         # Outbound port scan heuristic: one process hitting many unique targets fast
