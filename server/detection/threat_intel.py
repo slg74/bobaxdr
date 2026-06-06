@@ -84,7 +84,7 @@ class ThreatIntel:
         # volume (5+ queries in 2 minutes) which suggests automated payload fetching.
         self.abused_domains: Set[str] = {
             "docs.google.com", "drive.google.com", "sheets.google.com",
-            "slides.google.com", "storage.googleapis.com",
+            "slides.google.com", "storage.googleapis.com", "calendar.google.com",
             "raw.githubusercontent.com", "gist.github.com", "githubusercontent.com",
             "pastebin.com", "paste.ee", "rentry.co", "hastebin.com",
             "cdn.discordapp.com", "media.discordapp.net", "discord.com",
@@ -95,7 +95,9 @@ class ThreatIntel:
         }
 
         # Volume threshold: N queries within WINDOW seconds triggers an alert
-        self.abuse_threshold = 5
+        # 5 was too sensitive — Google Calendar alone can hit 5 queries to
+        # docs.google.com just from loading Drive integration in the background
+        self.abuse_threshold = 15
         self.abuse_window_secs = 120
 
     async def refresh(self):
