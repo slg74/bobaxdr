@@ -312,3 +312,86 @@ Check whether the alert is a false positive first:
 - Well-known vendor clouds (Azure `20.x`, AWS `34.x`/`52.x`, Google `142.250.x`) are usually benign even without a PTR record
 
 Real indicators worth blocking: unknown process + no PTR record + IP in Feodo/URLhaus blocklist + port 4444/8080/9001.
+
+---
+
+## Hardening EC2 Security Groups
+
+BobaxDR fires `EC2_SG_EXPOSED` alerts when an instance has inbound rules open to `0.0.0.0/0`. Here's how to remediate each finding.
+
+### Lock SSH (port 22) to your home IP only
+
+The most common critical finding. Leaving SSH open to the world exposes the instance to credential brute-force and exploitation of SSH vulnerabilities.
+
+```bash
+# 1. Remove the open rule
+aws ec2 revoke-security-group-ingress --region us-east-1 \
+    --group-id <sg-id> \
+    --protocol tcp --port 22 --cidr 0.0.0.0/0
+
+# 2. Add your current home IP (force IPv4 with -4)
+aws ec2 authorize-security-group-ingress --region us-east-1 \
+    --group-id <sg-id> \
+    --protocol tcp --port 22 --cidr $(curl -s -4 ifconfig.me)/32
+```
+
+> **Note:** Spectrum assigns dynamic IPs. If your home IP changes you'll lose SSH access and need to update the rule. See the Session Manager section below for a more permanent fix.
+
+### Lock RDP (port 3389) to your home IP only
+
+Same approach as SSH — RDP exposed to the internet is a Critical finding:
+
+```bash
+aws ec2 revoke-security-group-ingress --region us-east-1 \
+    --group-id <sg-id> \
+    --protocol tcp --port 3389 --cidr 0.0.0.0/0
+
+aws ec2 authorize-security-group-ingress --region us-east-1 \
+    --group-id <sg-id> \
+    --protocol tcp --port 3389 --cidr $(curl -s -4 ifconfig.me)/32
+```
+
+### Remove all-traffic rules
+
+If a security group has a rule allowing all protocols/ports to `0.0.0.0/0`:
+
+```bash
+aws ec2 revoke-security-group-ingress --region us-east-1 \
+    --group-id <sg-id> \
+    --protocol -1 --cidr 0.0.0.0/0
+```
+
+### Port 80/443 open to world (intentional web servers)
+
+High-severity but expected for public-facing web servers. If intentional, acknowledge the alert in BobaxDR — it will suppress re-alerting for 24 hours. If the instance is not meant to serve web traffic, remove the rule:
+
+```bash
+aws ec2 revoke-security-group-ingress --region us-east-1 \
+    --group-id <sg-id> \
+    --protocol tcp --port 80 --cidr 0.0.0.0/0
+```
+
+### Avoid the dynamic IP problem — use AWS Session Manager
+
+AWS Systems Manager Session Manager lets you SSH into instances through the AWS console or CLI without any inbound security group rules at all. No port 22 needed:
+
+```bash
+# Install the Session Manager plugin (macOS)
+brew install --cask session-manager-plugin
+
+# Connect to an instance (no SSH key or open port required)
+aws ssm start-session --region us-east-1 --target <instance-id>
+```
+
+Requirements: the instance needs the SSM Agent running (pre-installed on Amazon Linux 2/2023 and Ubuntu 20.04+ AMIs) and an IAM role with `AmazonSSMManagedInstanceCore` attached.
+
+### Verify the fix
+
+After updating rules, trigger a rescan from the BobaxDR project root:
+
+```bash
+BOBAXDR_API_KEY=$(cat .api_key) BOBAXDR_SERVER=http://localhost:8000 \
+    python3 cloud/aws_poller.py
+```
+
+The instance's SG issue pill in the dashboard should clear within seconds of the scan completing.
