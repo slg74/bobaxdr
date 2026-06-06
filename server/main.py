@@ -20,7 +20,7 @@ from sqlalchemy.orm import Session
 sys.path.insert(0, os.path.dirname(__file__))
 
 from database import get_db, engine, Base
-from models import Endpoint, Event, Alert, NetworkDevice
+from models import Endpoint, Event, Alert, NetworkDevice, CloudInstance
 from detection.engine import DetectionEngine
 from detection.threat_intel import ThreatIntel
 
@@ -179,6 +179,9 @@ async def ingest_event(
     if data.get("type") == "network_scan":
         background_tasks.add_task(_process_network_scan, data.get("devices", []))
 
+    if data.get("type") == "aws_scan":
+        background_tasks.add_task(_process_aws_scan, data.get("instances", []), data.get("region", "us-east-1"))
+
     background_tasks.add_task(engine_.run_detection, data, ep.id)
     return {"status": "ok", "event_id": ev.id}
 
@@ -331,6 +334,100 @@ async def dashboard_stats(db: Session = Depends(get_db), _=Depends(auth)):
     }
 
 
+# ── AWS scan processor ────────────────────────────────────────────────────────
+def _process_aws_scan(instances: list, region: str):
+    import json
+    from database import SessionLocal
+    db = SessionLocal()
+    try:
+        seen_ids = set()
+        for inst in instances:
+            iid   = inst.get("instance_id", "")
+            state = inst.get("state", "")
+            if not iid:
+                continue
+            seen_ids.add(iid)
+
+            lt_str = inst.get("launch_time")
+            lt = datetime.fromisoformat(lt_str) if lt_str else None
+
+            existing = db.query(CloudInstance).filter(CloudInstance.instance_id == iid).first()
+            if not existing:
+                ci = CloudInstance(
+                    instance_id=iid,
+                    name=inst.get("name", ""),
+                    instance_type=inst.get("instance_type", ""),
+                    state=state,
+                    public_ip=inst.get("public_ip", ""),
+                    private_ip=inst.get("private_ip", ""),
+                    region=region,
+                    ami_id=inst.get("ami_id", ""),
+                    launch_time=lt,
+                    security_groups=json.dumps(inst.get("security_groups", [])),
+                    sg_issues=json.dumps(inst.get("sg_issues", [])),
+                    first_seen=datetime.utcnow(),
+                    last_seen=datetime.utcnow(),
+                )
+                db.add(ci)
+                db.flush()
+                label = inst.get("name") or iid
+                db.add(Alert(
+                    endpoint_hostname=f"aws-{region}",
+                    rule_name="NEW_EC2_INSTANCE",
+                    severity="medium",
+                    title=f"New EC2 instance discovered: {label}",
+                    description=f"{iid} ({inst.get('instance_type')}) is {state} in {region}  public: {inst.get('public_ip') or 'none'}",
+                    indicator=iid,
+                    timestamp=datetime.utcnow(),
+                ))
+            else:
+                # State change
+                if existing.state != state:
+                    label = inst.get("name") or iid
+                    severity = "high" if state == "stopped" else "medium"
+                    db.add(Alert(
+                        endpoint_hostname=f"aws-{region}",
+                        rule_name="EC2_STATE_CHANGE",
+                        severity=severity,
+                        title=f"EC2 instance state changed: {label}",
+                        description=f"{iid} changed from {existing.state} → {state}",
+                        indicator=iid,
+                        timestamp=datetime.utcnow(),
+                    ))
+                    existing.prev_state = existing.state
+                    existing.state = state
+                existing.last_seen = datetime.utcnow()
+                existing.public_ip = inst.get("public_ip", "") or existing.public_ip
+                existing.sg_issues = json.dumps(inst.get("sg_issues", []))
+
+            # Security group alerts (dedup per instance+sg_id)
+            for issue in inst.get("sg_issues", []):
+                indicator = f"{iid}:{issue['sg_id']}"
+                window = datetime.utcnow() - timedelta(hours=24)
+                exists = db.query(Alert).filter(
+                    Alert.rule_name == "EC2_SG_EXPOSED",
+                    Alert.indicator == indicator,
+                    Alert.timestamp > window,
+                ).first()
+                if not exists:
+                    label = inst.get("name") or iid
+                    db.add(Alert(
+                        endpoint_hostname=f"aws-{region}",
+                        rule_name="EC2_SG_EXPOSED",
+                        severity=issue["severity"],
+                        title=f"EC2 security group exposed to internet: {label}",
+                        description=issue["description"],
+                        indicator=indicator,
+                        timestamp=datetime.utcnow(),
+                    ))
+        db.commit()
+        logger.info(f"AWS scan processed: {len(seen_ids)} instances in {region}")
+    except Exception:
+        logger.exception("AWS scan processing error")
+    finally:
+        db.close()
+
+
 # ── Network scan processor ────────────────────────────────────────────────────
 def _process_network_scan(devices: list):
     from database import SessionLocal
@@ -432,6 +529,12 @@ async def ack_device(device_id: int, db: Session = Depends(get_db), _=Depends(au
     d.known = True
     db.commit()
     return {"status": "ok"}
+
+
+# ── Cloud Instances ───────────────────────────────────────────────────────────
+@app.get("/api/cloud/instances")
+async def list_cloud_instances(db: Session = Depends(get_db), _=Depends(auth)):
+    return [i.to_dict() for i in db.query(CloudInstance).order_by(CloudInstance.region, CloudInstance.name).all()]
 
 
 # ── Reverse DNS ───────────────────────────────────────────────────────────────

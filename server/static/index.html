@@ -268,6 +268,25 @@ tr:hover td { background: rgba(59,130,246,.04); }
   margin-left: 6px;
 }
 
+/* ── Cloud instances ── */
+.cloud-table td { vertical-align: middle; }
+.state-badge {
+  display: inline-flex; align-items: center; gap: 5px;
+  padding: 3px 8px; border-radius: 4px; font-size: 11px; font-weight: 600;
+}
+.state-running  { background:rgba(34,197,94,.12);  color:#4ade80; border:1px solid rgba(34,197,94,.3); }
+.state-stopped  { background:rgba(234,179,8,.12);  color:#fbbf24; border:1px solid rgba(234,179,8,.3); }
+.state-stopping { background:rgba(249,115,22,.12); color:#fb923c; border:1px solid rgba(249,115,22,.3); }
+.state-other    { background:rgba(100,116,139,.12);color:#94a3b8; border:1px solid rgba(100,116,139,.3); }
+.sg-pill {
+  display: inline-flex; align-items: center; gap: 3px;
+  padding: 2px 7px; border-radius: 3px; font-size: 10px; font-weight: 600;
+  cursor: help; margin-right: 3px;
+}
+.sg-critical { background:rgba(239,68,68,.14);  color:#f87171; border:1px solid rgba(239,68,68,.3); }
+.sg-high     { background:rgba(249,115,22,.14); color:#fb923c; border:1px solid rgba(249,115,22,.3); }
+.sg-medium   { background:rgba(234,179,8,.14);  color:#fbbf24; border:1px solid rgba(234,179,8,.3); }
+
 /* ── Empty state ── */
 .empty { padding: 36px; text-align: center; color: var(--muted); font-size: 12px; line-height: 1.8; }
 
@@ -378,6 +397,18 @@ tr:hover td { background: rgba(59,130,246,.04); }
     </div>
 
   </div><!-- /layout -->
+
+  <!-- ── AWS Cloud panel (full width) ── -->
+  <div class="panel" style="margin-top:14px">
+    <div class="panel-head">
+      <div class="tab-bar">
+        <span class="ptab on" style="cursor:default">AWS EC2 — us-east-1</span>
+      </div>
+      <span class="count-badge" id="cloud-count">0</span>
+    </div>
+    <div id="cloud-body"><div class="empty">No instances yet — start the AWS poller.</div></div>
+  </div>
+
 </main>
 
 <!-- ── Events modal ── -->
@@ -697,6 +728,7 @@ async function refresh() {
     renderTI(dash.threat_intel);
 
     api('/api/devices').then(renderDevices).catch(() => {});
+    api('/api/cloud/instances').then(renderCloud).catch(() => {});
 
     document.getElementById('last-upd').textContent = 'Updated ' + new Date().toLocaleTimeString();
   } catch(e) {
@@ -742,6 +774,60 @@ function renderDevices(devs) {
 async function ackDevice(id) {
   await api(`/api/devices/${id}/acknowledge`, {method:'PUT'});
   api('/api/devices').then(renderDevices).catch(() => {});
+}
+
+// ── Cloud Instances ───────────────────────────────────────────
+function stateClass(s) {
+  if (s === 'running')  return 'state-running';
+  if (s === 'stopped')  return 'state-stopped';
+  if (s === 'stopping') return 'state-stopping';
+  return 'state-other';
+}
+
+function renderCloud(instances) {
+  document.getElementById('cloud-count').textContent = instances.length;
+  const el = document.getElementById('cloud-body');
+  if (!instances.length) {
+    el.innerHTML = '<div class="empty">No instances — start the AWS poller to discover EC2.</div>';
+    return;
+  }
+
+  const rows = instances.map(i => {
+    const label    = esc(i.name || i.instance_id);
+    const sgPills  = (i.sg_issues || []).map(issue =>
+      `<span class="sg-pill sg-${issue.severity}" title="${esc(issue.description)}">
+        ⚠ ${esc(issue.port_desc)}
+      </span>`
+    ).join('');
+    const uid = 'rc-' + (i.public_ip || i.instance_id).replace(/[.:]/g, '-');
+
+    return `<tr>
+      <td>
+        <strong>${label}</strong>
+        <div class="t-muted" style="font-family:monospace;font-size:11px">${esc(i.instance_id)}</div>
+      </td>
+      <td><span class="state-badge ${stateClass(i.state)}">${esc(i.state)}</span></td>
+      <td class="t-muted">${esc(i.instance_type)}</td>
+      <td>
+        ${i.public_ip
+          ? `<span class="rip mono" onclick="resolveIP('${esc(i.public_ip)}','${uid}')"
+               title="Click to resolve">${esc(i.public_ip)}</span>
+             <span class="rdns" id="${uid}"></span>`
+          : '<span class="t-muted">—</span>'}
+      </td>
+      <td><span class="mono t-muted">${esc(i.private_ip||'—')}</span></td>
+      <td>${sgPills || '<span class="t-muted">—</span>'}</td>
+      <td class="t-muted">${ago(i.launch_time)}</td>
+    </tr>`;
+  }).join('');
+
+  el.innerHTML = `<table class="cloud-table">
+    <thead><tr>
+      <th>Name / ID</th><th>State</th><th>Type</th>
+      <th>Public IP</th><th>Private IP</th><th>SG Issues</th><th>Launched</th>
+    </tr></thead>
+    <tbody>${rows}</tbody>
+  </table>`;
 }
 
 // ── Events modal ──────────────────────────────────────────────
