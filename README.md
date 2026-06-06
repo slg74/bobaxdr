@@ -1,6 +1,12 @@
 # BobaxDR — Home XDR
 
-A home-use Extended Detection and Response (XDR) system. Monitors endpoint processes and network connections across your home network, detects threats in real time, and presents findings in a live security dashboard.
+A home-use Extended Detection and Response (XDR) system that monitors your entire environment from a single dashboard — home network devices, endpoint processes and connections, AWS EC2 instances, Kubernetes pods, and Docker containers. Detects threats in real time and surfaces security misconfigurations across all layers.
+
+**Monitors:**
+- **Home network** — all devices via ARP scanning, new device alerts, ARP spoofing detection, DNS hijack detection, C2 beaconing, malicious IP/domain connections, port scans, crypto miners, suspicious processes
+- **AWS EC2** — instance inventory, state changes, security group exposure (SSH/RDP open to 0.0.0.0/0)
+- **Kubernetes** — pod inventory across all namespaces, CrashLoopBackOff detection, privileged pods, hostNetwork/hostPID, sensitive volume mounts, exposed NodePort/LoadBalancer services
+- **Docker** — running containers, privileged containers, host network mode, sensitive path mounts, ports bound to 0.0.0.0
 
 Built for Spectrum internet. Inspired by Palo Alto Cortex XDR.
 
