@@ -111,6 +111,70 @@ class CloudInstance(Base):
         }
 
 
+class DockerContainer(Base):
+    __tablename__ = "docker_containers"
+
+    id           = Column(Integer, primary_key=True)
+    container_id = Column(String(50), unique=True, index=True)
+    name         = Column(String(255))
+    image        = Column(String(500))
+    status       = Column(String(20))
+    ports        = Column(Text)   # JSON
+    infra        = Column(Boolean, default=False)
+    issues       = Column(Text)   # JSON
+    first_seen   = Column(DateTime, default=_utcnow)
+    last_seen    = Column(DateTime)
+
+    def to_dict(self):
+        return {
+            "id":           self.id,
+            "container_id": self.container_id,
+            "name":         self.name,
+            "image":        self.image,
+            "status":       self.status,
+            "ports":        _json.loads(self.ports)  if self.ports  else [],
+            "infra":        self.infra,
+            "issues":       _json.loads(self.issues) if self.issues else [],
+            "first_seen":   self.first_seen.isoformat() if self.first_seen else None,
+            "last_seen":    self.last_seen.isoformat()  if self.last_seen  else None,
+        }
+
+
+class K8sPod(Base):
+    __tablename__ = "k8s_pods"
+
+    id         = Column(Integer, primary_key=True)
+    context    = Column(String(100))
+    namespace  = Column(String(255))
+    name       = Column(String(255))
+    phase      = Column(String(50))
+    restarts   = Column(Integer, default=0)
+    images     = Column(Text)   # JSON
+    node       = Column(String(255))
+    system     = Column(Boolean, default=False)
+    issues     = Column(Text)   # JSON
+    first_seen = Column(DateTime, default=_utcnow)
+    last_seen  = Column(DateTime)
+
+    __table_args__ = (UniqueConstraint("context", "namespace", "name"),)
+
+    def to_dict(self):
+        return {
+            "id":         self.id,
+            "context":    self.context,
+            "namespace":  self.namespace,
+            "name":       self.name,
+            "phase":      self.phase,
+            "restarts":   self.restarts,
+            "images":     _json.loads(self.images)  if self.images  else [],
+            "node":       self.node,
+            "system":     self.system,
+            "issues":     _json.loads(self.issues)  if self.issues  else [],
+            "first_seen": self.first_seen.isoformat() if self.first_seen else None,
+            "last_seen":  self.last_seen.isoformat()  if self.last_seen  else None,
+        }
+
+
 class NetworkDevice(Base):
     __tablename__ = "network_devices"
 

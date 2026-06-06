@@ -287,6 +287,21 @@ tr:hover td { background: rgba(59,130,246,.04); }
 .sg-high     { background:rgba(249,115,22,.14); color:#fb923c; border:1px solid rgba(249,115,22,.3); }
 .sg-medium   { background:rgba(234,179,8,.14);  color:#fbbf24; border:1px solid rgba(234,179,8,.3); }
 
+/* ── Docker / K8s panels ── */
+.phase-running     { background:rgba(34,197,94,.12);  color:#4ade80; border:1px solid rgba(34,197,94,.3); }
+.phase-pending     { background:rgba(234,179,8,.12);  color:#fbbf24; border:1px solid rgba(234,179,8,.3); }
+.phase-crashloop   { background:rgba(239,68,68,.14);  color:#f87171; border:1px solid rgba(239,68,68,.3); }
+.phase-failed      { background:rgba(239,68,68,.14);  color:#f87171; border:1px solid rgba(239,68,68,.3); }
+.phase-other       { background:rgba(100,116,139,.12);color:#94a3b8; border:1px solid rgba(100,116,139,.3); }
+.issue-pill {
+  display:inline-flex; align-items:center; padding:2px 7px; border-radius:3px;
+  font-size:10px; font-weight:600; cursor:help; margin-right:3px; white-space:nowrap;
+}
+.ip-critical { background:rgba(239,68,68,.14);  color:#f87171; border:1px solid rgba(239,68,68,.3); }
+.ip-high     { background:rgba(249,115,22,.14); color:#fb923c; border:1px solid rgba(249,115,22,.3); }
+.ip-medium   { background:rgba(234,179,8,.14);  color:#fbbf24; border:1px solid rgba(234,179,8,.3); }
+.sys-badge   { font-size:9px; color:var(--muted); background:var(--surface2); border:1px solid var(--border); border-radius:3px; padding:1px 5px; margin-left:4px; }
+
 /* ── Empty state ── */
 .empty { padding: 36px; text-align: center; color: var(--muted); font-size: 12px; line-height: 1.8; }
 
@@ -410,6 +425,27 @@ tr:hover td { background: rgba(59,130,246,.04); }
   </div>
 
 </main>
+
+  <!-- ── Docker + K8s panels ── -->
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-top:14px">
+    <div class="panel">
+      <div class="panel-head">
+        <div class="tab-bar"><span class="ptab on" style="cursor:default">Docker Containers</span></div>
+        <span class="count-badge" id="docker-count">0</span>
+      </div>
+      <div id="docker-body"><div class="empty">No containers — start the Docker poller.</div></div>
+    </div>
+    <div class="panel">
+      <div class="panel-head">
+        <div class="tab-bar"><span class="ptab on" style="cursor:default">Kubernetes · kind-kind</span></div>
+        <span class="count-badge" id="k8s-count">0</span>
+      </div>
+      <div class="filters" style="gap:14px;font-size:11px;color:var(--muted);padding:8px 18px">
+        <label><input type="checkbox" id="k8s-hide-sys" checked onchange="renderK8s()"> Hide system pods</label>
+      </div>
+      <div id="k8s-body"><div class="empty">No pods — start the K8s poller.</div></div>
+    </div>
+  </div>
 
 <!-- ── Events modal ── -->
 <div class="modal-overlay" id="events-modal" onclick="closeModal(event)">
@@ -729,6 +765,8 @@ async function refresh() {
 
     api('/api/devices').then(renderDevices).catch(() => {});
     api('/api/cloud/instances').then(renderCloud).catch(() => {});
+    api('/api/docker/containers').then(renderDocker).catch(() => {});
+    api('/api/k8s/pods').then(pods => { allPods = pods; renderK8s(); }).catch(() => {});
 
     document.getElementById('last-upd').textContent = 'Updated ' + new Date().toLocaleTimeString();
   } catch(e) {
@@ -828,6 +866,72 @@ function renderCloud(instances) {
     </tr></thead>
     <tbody>${rows}</tbody>
   </table>`;
+}
+
+// ── Docker ────────────────────────────────────────────────────
+function renderDocker(containers) {
+  document.getElementById('docker-count').textContent = containers.length;
+  const el = document.getElementById('docker-body');
+  if (!containers.length) { el.innerHTML = '<div class="empty">No containers — start the Docker poller.</div>'; return; }
+
+  const rows = containers.map(c => {
+    const pills = (c.issues||[]).map(i =>
+      `<span class="issue-pill ip-${i.severity}" title="${esc(i.description)}">⚠ ${i.severity}</span>`
+    ).join('');
+    const infra = c.infra ? '<span class="sys-badge">infra</span>' : '';
+    return `<tr>
+      <td><strong>${esc(c.name)}</strong>${infra}</td>
+      <td class="mono t-muted" style="font-size:10px;max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap"
+          title="${esc(c.image)}">${esc(c.image)}</td>
+      <td><span class="state-badge ${c.status==='running'?'state-running':'state-stopped'}">${esc(c.status)}</span></td>
+      <td style="font-size:10px;color:var(--muted)">${(c.ports||[]).map(p=>`<div>${esc(p)}</div>`).join('')||'—'}</td>
+      <td>${pills||'<span class="t-muted">—</span>'}</td>
+    </tr>`;
+  }).join('');
+
+  el.innerHTML = `<table><thead><tr>
+    <th>Name</th><th>Image</th><th>Status</th><th>Ports</th><th>Issues</th>
+  </tr></thead><tbody>${rows}</tbody></table>`;
+}
+
+// ── Kubernetes ────────────────────────────────────────────────
+let allPods = [];
+
+function phaseClass(p) {
+  if (p === 'Running')           return 'phase-running';
+  if (p === 'Pending')           return 'phase-pending';
+  if (p === 'CrashLoopBackOff')  return 'phase-crashloop';
+  if (p === 'Failed')            return 'phase-failed';
+  return 'phase-other';
+}
+
+function renderK8s() {
+  const hideSystem = document.getElementById('k8s-hide-sys')?.checked;
+  const pods = hideSystem ? allPods.filter(p => !p.system) : allPods;
+  document.getElementById('k8s-count').textContent = pods.length;
+  const el = document.getElementById('k8s-body');
+  if (!pods.length) { el.innerHTML = '<div class="empty">No pods — start the K8s poller.</div>'; return; }
+
+  const rows = pods.map(p => {
+    const pills = (p.issues||[]).map(i =>
+      `<span class="issue-pill ip-${i.severity}" title="${esc(i.description)}">⚠ ${i.severity}</span>`
+    ).join('');
+    const sys = p.system ? '<span class="sys-badge">sys</span>' : '';
+    const restarts = p.restarts > 0
+      ? `<span style="color:${p.restarts>10?'var(--critical)':'var(--muted)'};font-size:11px">${p.restarts}↺</span>`
+      : '—';
+    return `<tr>
+      <td class="t-muted" style="font-size:11px">${esc(p.namespace)}</td>
+      <td><strong>${esc(p.name)}</strong>${sys}</td>
+      <td><span class="state-badge ${phaseClass(p.phase)}">${esc(p.phase)}</span></td>
+      <td>${restarts}</td>
+      <td>${pills||'<span class="t-muted">—</span>'}</td>
+    </tr>`;
+  }).join('');
+
+  el.innerHTML = `<table><thead><tr>
+    <th>Namespace</th><th>Pod</th><th>Phase</th><th>Restarts</th><th>Issues</th>
+  </tr></thead><tbody>${rows}</tbody></table>`;
 }
 
 // ── Events modal ──────────────────────────────────────────────

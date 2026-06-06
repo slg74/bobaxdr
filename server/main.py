@@ -20,7 +20,7 @@ from sqlalchemy.orm import Session
 sys.path.insert(0, os.path.dirname(__file__))
 
 from database import get_db, engine, Base
-from models import Endpoint, Event, Alert, NetworkDevice, CloudInstance
+from models import Endpoint, Event, Alert, NetworkDevice, CloudInstance, DockerContainer, K8sPod
 from detection.engine import DetectionEngine
 from detection.threat_intel import ThreatIntel
 
@@ -181,6 +181,13 @@ async def ingest_event(
 
     if data.get("type") == "aws_scan":
         background_tasks.add_task(_process_aws_scan, data.get("instances", []), data.get("region", "us-east-1"))
+
+    if data.get("type") == "docker_scan":
+        background_tasks.add_task(_process_docker_scan, data.get("containers", []))
+
+    if data.get("type") == "k8s_scan":
+        background_tasks.add_task(_process_k8s_scan,
+            data.get("pods", []), data.get("services", []), data.get("context", "kind-kind"))
 
     background_tasks.add_task(engine_.run_detection, data, ep.id)
     return {"status": "ok", "event_id": ev.id}
@@ -428,6 +435,170 @@ def _process_aws_scan(instances: list, region: str):
         db.close()
 
 
+# ── Docker scan processor ─────────────────────────────────────────────────────
+def _process_docker_scan(containers: list):
+    import json
+    from database import SessionLocal
+    db = SessionLocal()
+    try:
+        for c in containers:
+            cid = c.get("container_id", "")
+            if not cid:
+                continue
+            existing = db.query(DockerContainer).filter(DockerContainer.container_id == cid).first()
+            if not existing:
+                dc = DockerContainer(
+                    container_id=cid,
+                    name=c.get("name", ""),
+                    image=c.get("image", ""),
+                    status=c.get("status", ""),
+                    ports=json.dumps(c.get("ports", [])),
+                    infra=c.get("infra", False),
+                    issues=json.dumps(c.get("issues", [])),
+                    first_seen=datetime.utcnow(),
+                    last_seen=datetime.utcnow(),
+                )
+                db.add(dc)
+                db.flush()
+                if not c.get("infra"):
+                    db.add(Alert(
+                        endpoint_hostname="docker-desktop",
+                        rule_name="NEW_CONTAINER",
+                        severity="low",
+                        title=f"New container started: {c.get('name')}",
+                        description=f"Image: {c.get('image')}  ports: {', '.join(c.get('ports', [])) or 'none'}",
+                        indicator=cid,
+                        timestamp=datetime.utcnow(),
+                    ))
+            else:
+                existing.last_seen = datetime.utcnow()
+                existing.status = c.get("status", existing.status)
+                existing.issues = json.dumps(c.get("issues", []))
+
+            # Security issue alerts (dedup 24h)
+            for issue in c.get("issues", []):
+                indicator = f"{cid}:{issue['description'][:60]}"
+                window = datetime.utcnow() - timedelta(hours=24)
+                if not db.query(Alert).filter(
+                    Alert.rule_name == "CONTAINER_SECURITY",
+                    Alert.indicator == indicator,
+                    Alert.timestamp > window,
+                ).first():
+                    db.add(Alert(
+                        endpoint_hostname="docker-desktop",
+                        rule_name="CONTAINER_SECURITY",
+                        severity=issue["severity"],
+                        title=f"Container security issue: {c.get('name')}",
+                        description=issue["description"],
+                        indicator=indicator,
+                        timestamp=datetime.utcnow(),
+                    ))
+        db.commit()
+    except Exception:
+        logger.exception("Docker scan processing error")
+    finally:
+        db.close()
+
+
+# ── K8s scan processor ────────────────────────────────────────────────────────
+def _process_k8s_scan(pods: list, services: list, context: str):
+    import json
+    from database import SessionLocal
+    db = SessionLocal()
+    try:
+        for p in pods:
+            ns, name, phase = p["namespace"], p["name"], p["phase"]
+            existing = db.query(K8sPod).filter(
+                K8sPod.context == context,
+                K8sPod.namespace == ns,
+                K8sPod.name == name,
+            ).first()
+
+            if not existing:
+                kp = K8sPod(
+                    context=context, namespace=ns, name=name,
+                    phase=phase, restarts=p.get("restarts", 0),
+                    images=json.dumps(p.get("images", [])),
+                    node=p.get("node", ""), system=p.get("system", False),
+                    issues=json.dumps(p.get("issues", [])),
+                    first_seen=datetime.utcnow(), last_seen=datetime.utcnow(),
+                )
+                db.add(kp)
+                db.flush()
+                if not p.get("system"):
+                    db.add(Alert(
+                        endpoint_hostname=context,
+                        rule_name="NEW_K8S_POD",
+                        severity="low",
+                        title=f"New pod: {ns}/{name}",
+                        description=f"Phase: {phase}  images: {', '.join(p.get('images', []))}",
+                        indicator=f"{ns}/{name}",
+                        timestamp=datetime.utcnow(),
+                    ))
+            else:
+                if existing.phase != phase:
+                    sev = "high" if phase == "CrashLoopBackOff" else "medium"
+                    db.add(Alert(
+                        endpoint_hostname=context,
+                        rule_name="K8S_POD_STATE_CHANGE",
+                        severity=sev,
+                        title=f"Pod state changed: {ns}/{name}",
+                        description=f"{existing.phase} → {phase}  restarts: {p.get('restarts', 0)}",
+                        indicator=f"{ns}/{name}",
+                        timestamp=datetime.utcnow(),
+                    ))
+                existing.phase = phase
+                existing.restarts = p.get("restarts", existing.restarts)
+                existing.issues = json.dumps(p.get("issues", []))
+                existing.last_seen = datetime.utcnow()
+
+            # Security issues (dedup 24h)
+            for issue in p.get("issues", []):
+                indicator = f"{ns}/{name}:{issue['description'][:60]}"
+                window = datetime.utcnow() - timedelta(hours=24)
+                if not db.query(Alert).filter(
+                    Alert.rule_name == "K8S_SECURITY",
+                    Alert.indicator == indicator,
+                    Alert.timestamp > window,
+                ).first():
+                    db.add(Alert(
+                        endpoint_hostname=context,
+                        rule_name="K8S_SECURITY",
+                        severity=issue["severity"],
+                        title=f"K8s security issue: {ns}/{name}",
+                        description=issue["description"],
+                        indicator=f"{ns}/{name}",
+                        timestamp=datetime.utcnow(),
+                    ))
+
+        # Exposed services
+        for svc in services:
+            if not svc.get("exposed"):
+                continue
+            indicator = f"{svc['namespace']}/{svc['name']}"
+            window = datetime.utcnow() - timedelta(hours=24)
+            if not db.query(Alert).filter(
+                Alert.rule_name == "K8S_SERVICE_EXPOSED",
+                Alert.indicator == indicator,
+                Alert.timestamp > window,
+            ).first():
+                db.add(Alert(
+                    endpoint_hostname=context,
+                    rule_name="K8S_SERVICE_EXPOSED",
+                    severity="medium",
+                    title=f"K8s service externally exposed: {indicator}",
+                    description=f"Type: {svc['type']}  ports: {', '.join(svc['ports'])}",
+                    indicator=indicator,
+                    timestamp=datetime.utcnow(),
+                ))
+        db.commit()
+        logger.info(f"K8s scan processed: {len(pods)} pods, {len(services)} services in {context}")
+    except Exception:
+        logger.exception("K8s scan processing error")
+    finally:
+        db.close()
+
+
 # ── Network scan processor ────────────────────────────────────────────────────
 def _process_network_scan(devices: list):
     from database import SessionLocal
@@ -535,6 +706,29 @@ async def ack_device(device_id: int, db: Session = Depends(get_db), _=Depends(au
 @app.get("/api/cloud/instances")
 async def list_cloud_instances(db: Session = Depends(get_db), _=Depends(auth)):
     return [i.to_dict() for i in db.query(CloudInstance).order_by(CloudInstance.region, CloudInstance.name).all()]
+
+
+# ── Docker + K8s endpoints ────────────────────────────────────────────────────
+@app.get("/api/docker/containers")
+async def list_containers(db: Session = Depends(get_db), _=Depends(auth)):
+    return [c.to_dict() for c in db.query(DockerContainer).order_by(DockerContainer.name).all()]
+
+
+@app.get("/api/k8s/pods")
+async def list_pods(db: Session = Depends(get_db), _=Depends(auth)):
+    return [p.to_dict() for p in db.query(K8sPod).order_by(K8sPod.namespace, K8sPod.name).all()]
+
+
+@app.get("/api/k8s/summary")
+async def k8s_summary(db: Session = Depends(get_db), _=Depends(auth)):
+    pods = db.query(K8sPod).all()
+    return {
+        "total":       len(pods),
+        "running":     sum(1 for p in pods if p.phase == "Running"),
+        "crashloop":   sum(1 for p in pods if p.phase == "CrashLoopBackOff"),
+        "user_pods":   sum(1 for p in pods if not p.system),
+        "issues":      sum(1 for p in pods if p.issues and p.issues != "[]"),
+    }
 
 
 # ── Reverse DNS ───────────────────────────────────────────────────────────────
