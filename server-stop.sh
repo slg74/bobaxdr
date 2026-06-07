@@ -1,17 +1,22 @@
 #!/usr/bin/env bash
-PID_FILE="/tmp/bobaxdr-server.pid"
 
-if [ ! -f "$PID_FILE" ]; then
-  echo "No PID file found — server may not be running"
-  exit 0
-fi
+stop_pid() {
+  local name="$1" pid_file="$2"
+  if [ ! -f "$pid_file" ]; then
+    return
+  fi
+  local pid
+  pid=$(cat "$pid_file")
+  if kill -0 "$pid" 2>/dev/null; then
+    kill "$pid"
+    echo "$name stopped (PID $pid)"
+  else
+    echo "$name was not running (stale PID $pid)"
+  fi
+  rm -f "$pid_file"
+}
 
-PID=$(cat "$PID_FILE")
-if kill -0 "$PID" 2>/dev/null; then
-  kill "$PID"
-  echo "Server stopped (PID $PID)"
-else
-  echo "Server was not running (stale PID $PID)"
-fi
-
-rm -f "$PID_FILE"
+stop_pid "k8s poller"    /tmp/bobaxdr-k8s.pid
+stop_pid "Docker poller" /tmp/bobaxdr-docker.pid
+stop_pid "AWS poller"    /tmp/bobaxdr-aws.pid
+stop_pid "Server"        /tmp/bobaxdr-server.pid

@@ -38,8 +38,29 @@ if [ ! -f "$KEY_FILE" ]; then
 fi
 
 chmod 600 "$KEY_FILE"
+export BOBAXDR_API_KEY="$(cat "$KEY_FILE")"
+export BOBAXDR_SERVER="http://localhost:8000"
 
+# ── Pollers ───────────────────────────────────────────────────────────────────
+start_poller() {
+  local name="$1" script="$2" pid_file="$3" log_file="$4"
+  if [ -f "$pid_file" ] && kill -0 "$(cat "$pid_file")" 2>/dev/null; then
+    echo "  $name already running (PID $(cat "$pid_file"))"
+    return
+  fi
+  cd "$SCRIPT_DIR"
+  "$PYTHON" "$script" >> "$log_file" 2>&1 &
+  echo $! > "$pid_file"
+  echo "  $name running (PID $(cat "$pid_file"))"
+}
+
+echo "Starting pollers…"
+start_poller "AWS poller"    cloud/aws_poller.py    /tmp/bobaxdr-aws.pid    /tmp/bobaxdr-aws.log
+start_poller "Docker poller" cloud/docker_poller.py /tmp/bobaxdr-docker.pid /tmp/bobaxdr-docker.log
+start_poller "k8s poller"    cloud/k8s_poller.py    /tmp/bobaxdr-k8s.pid    /tmp/bobaxdr-k8s.log
+
+echo ""
 echo "Server running (PID $(cat "$PID_FILE"))"
 echo "  Dashboard : http://localhost:8000"
 echo "  API key   : $(cat "$KEY_FILE")"
-echo "  Log       : $LOG_FILE"
+echo "  Server log: $LOG_FILE"
