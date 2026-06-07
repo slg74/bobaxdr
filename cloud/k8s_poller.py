@@ -38,15 +38,19 @@ SENSITIVE_HOST_PATHS = {"/etc", "/var/run/docker.sock", "/proc", "/sys", "/root"
 PRIVILEGED_WHITELIST = {"kube-proxy", "kube-apiserver", "etcd", "kube-scheduler",
                         "kube-controller-manager", "kindnet-cni", "install-cni"}
 
+# Namespaces where /sys and /proc mounts are expected (observability agents need host metrics)
+MONITORING_NS = {"monitoring", "observability", "prometheus", "grafana", "metrics"}
+
 
 def _pod_issues(pod) -> list[dict]:
     issues = []
     spec = pod.spec
+    ns = pod.metadata.namespace
 
-    if spec.host_network:
+    if spec.host_network and ns not in MONITORING_NS:
         issues.append({"severity": "high",
                        "description": "Pod using hostNetwork — shares host network stack"})
-    if spec.host_pid:
+    if spec.host_pid and ns not in MONITORING_NS:
         issues.append({"severity": "high",
                        "description": "Pod using hostPID — can see all host processes"})
 
@@ -63,10 +67,13 @@ def _pod_issues(pod) -> list[dict]:
                 issues.append({"severity": "medium",
                                "description": f"Container '{c.name}' allows privilege escalation"})
 
+    monitoring_exempt = {"/sys", "/proc"}
     for vol in (spec.volumes or []):
         if vol.host_path:
             path = vol.host_path.path
             if any(path.startswith(s) for s in SENSITIVE_HOST_PATHS):
+                if ns in MONITORING_NS and any(path.startswith(e) for e in monitoring_exempt):
+                    continue
                 issues.append({"severity": "high",
                                "description": f"Sensitive hostPath volume: {path}"})
 
