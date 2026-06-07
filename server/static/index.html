@@ -415,6 +415,16 @@ tr:hover td { background: rgba(59,130,246,.04); }
 
       <div class="panel">
         <div class="panel-head">
+          <span class="panel-title">Pollers</span>
+          <span class="count-badge" id="poller-count">0</span>
+        </div>
+        <div id="poller-body">
+          <div class="empty">No pollers running.</div>
+        </div>
+      </div>
+
+      <div class="panel">
+        <div class="panel-head">
           <span class="panel-title">Threat Intelligence</span>
           <button class="ack" onclick="refreshTI()" style="font-size:10px">Refresh</button>
         </div>
@@ -637,14 +647,17 @@ function renderTalkers() {
 }
 
 // ── Render: Endpoints ─────────────────────────────────────────
+const POLLER_PLATFORMS = new Set(['aws', 'docker', 'kubernetes', 'sensor']);
+const POLLER_LABELS = { aws: 'AWS', docker: 'Docker', kubernetes: 'k8s', sensor: 'Sensor' };
+
 function renderEndpoints(eps) {
-  document.getElementById('ep-count').textContent = eps.length;
+  const agents  = eps.filter(e => !POLLER_PLATFORMS.has(e.platform));
+  const pollers = eps.filter(e =>  POLLER_PLATFORMS.has(e.platform));
+
+  // ── Agents ──
+  document.getElementById('ep-count').textContent = agents.length;
   const el = document.getElementById('ep-body');
-  if (!eps.length) {
-    el.innerHTML = '<div class="empty">No endpoints registered yet.<br>Start the agent on your devices.</div>';
-    return;
-  }
-  el.innerHTML = eps.map(e => `
+  el.innerHTML = agents.length ? agents.map(e => `
     <div class="ep-row">
       <div class="ep-info">
         <span class="ep-dot ${e.online?'on':'off'}"></span>
@@ -652,7 +665,22 @@ function renderEndpoints(eps) {
         <small>${esc(e.platform)} · ${esc(e.ip_address||'unknown IP')}</small>
       </div>
       <span class="t-muted">${ago(e.last_seen)}</span>
-    </div>`).join('');
+    </div>`).join('')
+  : '<div class="empty">No endpoints registered yet.<br>Start the agent on your devices.</div>';
+
+  // ── Pollers ──
+  document.getElementById('poller-count').textContent = pollers.length;
+  const pl = document.getElementById('poller-body');
+  pl.innerHTML = pollers.length ? pollers.map(e => `
+    <div class="ep-row">
+      <div class="ep-info">
+        <span class="ep-dot ${e.online?'on':'off'}"></span>
+        <strong>${esc(e.hostname)}</strong>
+        <small>${esc(POLLER_LABELS[e.platform] || e.platform)}</small>
+      </div>
+      <span class="t-muted">${ago(e.last_seen)}</span>
+    </div>`).join('')
+  : '<div class="empty">No pollers running.</div>';
 }
 
 // ── Render: Threat Intel ──────────────────────────────────────
@@ -829,8 +857,9 @@ async function refresh() {
     document.getElementById('s-crit').textContent = nc;
     document.getElementById('s-crit').className = 'card-value ' + (nc > 0 ? 'critical' : 'ok');
 
-    document.getElementById('s-ep').textContent = dash.active_endpoints;
-    document.getElementById('s-ep-sub').textContent = `of ${dash.total_endpoints} total`;
+    const agentEps = eps.filter(e => !POLLER_PLATFORMS.has(e.platform));
+    document.getElementById('s-ep').textContent = agentEps.filter(e => e.online).length;
+    document.getElementById('s-ep-sub').textContent = `of ${agentEps.length} total`;
     document.getElementById('s-events').textContent = (dash.events_24h||0).toLocaleString();
 
     allAlerts  = alerts;
