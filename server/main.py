@@ -559,7 +559,7 @@ def _process_k8s_scan(pods: list, services: list, context: str):
                 existing.issues = json.dumps(p.get("issues", []))
                 existing.last_seen = datetime.utcnow()
 
-            # Security issues (dedup 24h)
+            # Security issues (dedup 24h — indicator must match what is stored)
             for issue in p.get("issues", []):
                 indicator = f"{ns}/{name}:{issue['description'][:60]}"
                 window = datetime.utcnow() - timedelta(hours=24)
@@ -574,7 +574,7 @@ def _process_k8s_scan(pods: list, services: list, context: str):
                         severity=issue["severity"],
                         title=f"K8s security issue: {ns}/{name}",
                         description=issue["description"],
-                        indicator=f"{ns}/{name}",
+                        indicator=indicator,
                         timestamp=datetime.utcnow(),
                     ))
 

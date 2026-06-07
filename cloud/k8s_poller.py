@@ -34,12 +34,16 @@ SYSTEM_NS = {"kube-system", "kube-public", "kube-node-lease",
 
 SENSITIVE_HOST_PATHS = {"/etc", "/var/run/docker.sock", "/proc", "/sys", "/root"}
 
-# Core system containers that legitimately require privileged mode — not actionable findings
+# Core system containers that legitimately require privileged mode
 PRIVILEGED_WHITELIST = {"kube-proxy", "kube-apiserver", "etcd", "kube-scheduler",
                         "kube-controller-manager", "kindnet-cni", "install-cni"}
 
-# Namespaces where /sys and /proc mounts are expected (observability agents need host metrics)
+# Namespaces where observability agents legitimately need host access
 MONITORING_NS = {"monitoring", "observability", "prometheus", "grafana", "metrics"}
+
+# hostPath prefixes that are expected in kube-system (TLS certs, CNI config, kubeconfig)
+SYSTEM_HOSTPATH_OK = {"/etc/kubernetes", "/etc/ca-certificates", "/etc/ssl/certs",
+                      "/etc/cni", "/etc/containerd"}
 
 
 def _pod_issues(pod) -> list[dict]:
@@ -47,10 +51,11 @@ def _pod_issues(pod) -> list[dict]:
     spec = pod.spec
     ns = pod.metadata.namespace
 
-    if spec.host_network and ns not in MONITORING_NS:
+    host_ns_exempt = MONITORING_NS | SYSTEM_NS
+    if spec.host_network and ns not in host_ns_exempt:
         issues.append({"severity": "high",
                        "description": "Pod using hostNetwork — shares host network stack"})
-    if spec.host_pid and ns not in MONITORING_NS:
+    if spec.host_pid and ns not in host_ns_exempt:
         issues.append({"severity": "high",
                        "description": "Pod using hostPID — can see all host processes"})
 
@@ -67,15 +72,17 @@ def _pod_issues(pod) -> list[dict]:
                 issues.append({"severity": "medium",
                                "description": f"Container '{c.name}' allows privilege escalation"})
 
-    monitoring_exempt = {"/sys", "/proc"}
     for vol in (spec.volumes or []):
         if vol.host_path:
             path = vol.host_path.path
-            if any(path.startswith(s) for s in SENSITIVE_HOST_PATHS):
-                if ns in MONITORING_NS and any(path.startswith(e) for e in monitoring_exempt):
-                    continue
-                issues.append({"severity": "high",
-                               "description": f"Sensitive hostPath volume: {path}"})
+            if not any(path.startswith(s) for s in SENSITIVE_HOST_PATHS):
+                continue
+            if ns in MONITORING_NS and path in ("/sys", "/proc"):
+                continue
+            if ns in SYSTEM_NS and any(path.startswith(s) for s in SYSTEM_HOSTPATH_OK):
+                continue
+            issues.append({"severity": "high",
+                           "description": f"Sensitive hostPath volume: {path}"})
 
     return issues
 
