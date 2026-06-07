@@ -14,6 +14,19 @@ Built for Spectrum internet. Inspired by Palo Alto Cortex XDR.
 
 ---
 
+## Changelog
+
+### 2026-06-07
+- **Startup scripts** — replaced monolithic `start.sh` with `server-start.sh`, `server-stop.sh`, `agent-start.sh`, `agent-stop.sh`. Server script auto-starts all pollers and writes PID files to `/tmp/`. Agent script auto-detects virtualenv and Python path (supports both macOS Python 3.12 and Linux venv layouts).
+- **Pollers panel** — AWS, Docker, and Kubernetes pollers now appear in their own dashboard section; they no longer inflate the active-endpoint count.
+- **TOR_RELAY_CONNECTION rule** — fires on any outbound connection to port 9001 (Tor OR) or 9030 (Tor directory). Severity is Critical when the process is unnamed/unknown, High otherwise. PID and connection metadata are captured in `raw_data`.
+- **Alert Detail button** — alerts that capture process context show a Detail button that opens a modal with PID, process name, remote IP/port, connection status, and detection timestamp.
+- **parsecd added to benign list** — Apple's Siri/Spotlight/Safari Suggestions daemon was generating false-positive C2 beaconing alerts; suppressed at the detection layer.
+- **API key hardening** — `.api_key` is `chmod 600` on every server start.
+- **Git history cleaned** — `bobaxdr.db` permanently removed from repository history via `git-filter-repo`.
+
+---
+
 ## Architecture
 
 ```
@@ -31,10 +44,17 @@ bobaxdr/
 │   ├── agent.py             # Main loop — collects and reports data
 │   ├── process_monitor.py   # Running processes via psutil
 │   └── network_monitor.py   # Active connections per process
+├── cloud/                   # Cloud & container pollers
+│   ├── aws_poller.py        # EC2 inventory + security group checks
+│   ├── docker_poller.py     # Running containers, privileged flags
+│   └── k8s_poller.py        # Pod inventory, CrashLoopBackOff, hostNetwork
 ├── sensor/
 │   └── sensor.py            # Network sensor (packet capture or fallback)
+├── server-start.sh          # Start server + all pollers (writes PID files)
+├── server-stop.sh           # Stop server + all pollers
+├── agent-start.sh           # Start agent (auto-detects venv, Python path)
+├── agent-stop.sh            # Stop agent
 ├── install.sh               # Dependency installer
-├── start.sh                 # Start server + local agent together
 ├── requirements-server.txt
 ├── requirements-agent.txt
 └── requirements-sensor.txt
@@ -50,17 +70,35 @@ bobaxdr/
 bash install.sh
 ```
 
-### 2. Start the server + local agent
+### 2. Start the server (and pollers)
 
 ```bash
-bash start.sh
+bash server-start.sh
 ```
 
-On first run an API key is generated and printed. The dashboard opens at **http://localhost:8000**.
+This starts the FastAPI server, then waits for the API key to be generated and auto-starts the AWS, Docker, and Kubernetes pollers. PID files are written to `/tmp/bobaxdr-*.pid`; logs go to `/tmp/bobaxdr-*.log`. The dashboard opens at **http://localhost:8000**.
 
-### 3. Add more devices
+To stop everything cleanly:
 
-Copy the API key printed on first server start (also saved to `.api_key` in the project root), then follow the steps for each platform below.
+```bash
+bash server-stop.sh
+```
+
+### 3. Start the agent on this machine
+
+```bash
+bash agent-start.sh
+```
+
+The script auto-detects a virtualenv and the correct Python path. It reads the API key from `.api_key` (or `$BOBAXDR_API_KEY` if set) and defaults `BOBAXDR_SERVER` to `http://localhost:8000`. Stop it with:
+
+```bash
+bash agent-stop.sh
+```
+
+### 4. Add more devices
+
+Copy the API key from `.api_key` in the project root, then follow the steps for each platform below.
 
 ---
 
@@ -68,11 +106,12 @@ Copy the API key printed on first server start (also saved to `.api_key` in the 
 
 The agent runs on macOS, Windows, and Linux. It reports running processes and active network connections to the server every 10–30 seconds.
 
-### macOS
+### macOS (remote)
 
 ```bash
-# Copy the three agent files to the target machine
+# Copy agent files + start/stop scripts
 scp agent/agent.py agent/process_monitor.py agent/network_monitor.py \
+    agent-start.sh agent-stop.sh \
     user@<target-ip>:~/bobaxdr-agent/
 
 # On the target Mac
@@ -80,32 +119,32 @@ cd ~/bobaxdr-agent
 /Library/Frameworks/Python.framework/Versions/3.12/bin/pip3 install psutil requests
 export BOBAXDR_API_KEY=<key>
 export BOBAXDR_SERVER=http://<server-ip>:8000
-/Library/Frameworks/Python.framework/Versions/3.12/bin/python3 agent.py
+bash agent-start.sh
 ```
 
-> Use the full Python 3.12 path — the Xcode-bundled Python 3.9 at `/usr/bin/python3` will not work correctly.
+> The script auto-selects the Python 3.12 framework install when present, falling back to system `python3`. The Xcode-bundled Python 3.9 at `/usr/bin/python3` will not work correctly.
 
 ### Linux (Kali, Ubuntu, Debian)
 
-Modern Debian-based distros block system-wide pip installs. Use a virtualenv:
+Modern Debian-based distros block system-wide pip installs. `agent-start.sh` handles venv detection automatically:
 
 ```bash
-# Copy agent files
+# Copy agent files + start/stop scripts
 scp agent/agent.py agent/process_monitor.py agent/network_monitor.py \
+    agent-start.sh agent-stop.sh \
     user@<target-ip>:~/bobaxdr-agent/
 
-# On the target Linux machine
+# On the target Linux machine — create the venv once
 cd ~/bobaxdr-agent
 python3 -m venv venv
 source venv/bin/activate
 pip install psutil requests
 
+# Then start (re-activates venv automatically)
 export BOBAXDR_API_KEY=<key>
 export BOBAXDR_SERVER=http://<server-ip>:8000
-python3 agent.py
+bash agent-start.sh
 ```
-
-To keep the venv active across sessions, add `source ~/bobaxdr-agent/venv/bin/activate` to `~/.bashrc`.
 
 ### Windows
 
@@ -140,7 +179,7 @@ curl -s -H "x-api-key: $(cat .api_key)" http://localhost:8000/api/endpoints
 
 ---
 
-### 4. Enable full network sensor (optional, requires sudo)
+### 5. Enable full network sensor (optional, requires sudo)
 
 For DNS query monitoring and inbound port scan detection via packet capture:
 
@@ -159,9 +198,12 @@ Without sudo the sensor falls back to connection-level monitoring and still does
 The web dashboard at **http://localhost:8000** shows:
 
 - **Active alerts** with severity badges (Critical / High / Medium / Low)
-- **Endpoint status** — online/offline, platform, IP, last seen
+  - **Detail button** — alerts that capture process context (e.g. `TOR_RELAY_CONNECTION`) show a Detail button that opens a modal with PID, process name, remote IP/port, connection status, and detection timestamp
+  - Acknowledge button clears resolved findings; deduplication suppresses re-alerting for 10 minutes
+- **Endpoints** — real agents (online/offline, platform, IP, last seen) shown separately from cloud/container pollers
+- **Pollers** — AWS, Docker, and Kubernetes pollers appear in their own panel so they don't inflate the active-endpoint count
 - **Threat intelligence status** — how many malicious IPs and domains are loaded
-- Filter alerts by severity; acknowledge and clear resolved findings
+- Filter alerts by severity
 - Auto-refreshes every 15 seconds
 
 ---
@@ -179,9 +221,12 @@ The web dashboard at **http://localhost:8000** shows:
 | `PORT_SCAN_OUTBOUND` | Medium | A single process hitting 20+ unique external targets in one reporting interval |
 | `DNS_TUNNELING` | Medium | DNS query sent to a non-standard port (not 53 / 853 / 5353) |
 | `SUSPICIOUS_DNS_SERVER` | Medium | DNS routed to an unrecognized external server (not Spectrum 75.75.75.75/76, Google, Cloudflare, etc.) |
+| `TOR_RELAY_CONNECTION` | Critical / High | Outbound connection to a known Tor OR port (9001) or directory port (9030). Escalates to Critical when the connecting process is unnamed/unknown — a named process connecting to Tor is High |
 | `SUSPICIOUS_PROCESS_PATH` | High | Executable running from /tmp, Downloads, AppData Temp, or /dev/shm |
 
 Alerts are deduplicated — the same rule + indicator on the same endpoint won't re-fire within 10 minutes.
+
+Alerts with process context (PID, connection details) store a JSON blob in the `raw_data` field and show a **Detail** button in the dashboard.
 
 ---
 
