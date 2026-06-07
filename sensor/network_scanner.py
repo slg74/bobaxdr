@@ -50,8 +50,7 @@ def scan_with_scapy(subnet: str) -> list[dict]:
 
     devices = []
     try:
-        ans, _ = srp(Ether(dst="ff:ff:ff:ff:ff:ff") / ARP(pdst=subnet),
-                     timeout=3, verbose=False)
+        ans, _ = srp(Ether(dst="ff:ff:ff:ff:ff:ff") / ARP(pdst=subnet), timeout=3, verbose=False)
         for _, rcv in ans:
             ip = rcv.psrc
             mac = rcv.hwsrc
@@ -67,7 +66,8 @@ def scan_with_nmap(subnet: str) -> list[dict]:
     try:
         out = subprocess.check_output(
             ["nmap", "-sn", "-T4", subnet, "--open"],
-            stderr=subprocess.DEVNULL, timeout=60,
+            stderr=subprocess.DEVNULL,
+            timeout=60,
         ).decode()
         # Parse nmap output for IPs and hostnames
         current = {}
@@ -157,12 +157,16 @@ def scanner_loop(server_url: str, api_key: str, hostname: str):
         try:
             devices = run_scan(subnet)
             if devices:
-                session.post(f"{server_url}/api/events", json={
-                    "type": "network_scan",
-                    "hostname": hostname,
-                    "platform": "sensor",
-                    "devices": devices,
-                }, timeout=10)
+                session.post(
+                    f"{server_url}/api/events",
+                    json={
+                        "type": "network_scan",
+                        "hostname": hostname,
+                        "platform": "sensor",
+                        "devices": devices,
+                    },
+                    timeout=10,
+                )
         except Exception as e:
             logger.error(f"Scanner loop error: {e}")
         time.sleep(SCAN_INTERVAL)

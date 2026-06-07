@@ -1,6 +1,15 @@
 import json as _json
 from datetime import datetime, timezone
-from sqlalchemy import Column, Integer, String, DateTime, Text, Boolean, ForeignKey, UniqueConstraint
+from sqlalchemy import (
+    Column,
+    Integer,
+    String,
+    DateTime,
+    Text,
+    Boolean,
+    ForeignKey,
+    UniqueConstraint,
+)
 from database import Base
 
 
@@ -78,102 +87,102 @@ class Alert(Base):
 class CloudInstance(Base):
     __tablename__ = "cloud_instances"
 
-    id            = Column(Integer, primary_key=True)
-    instance_id   = Column(String(50), unique=True, index=True)
-    name          = Column(String(255))
+    id = Column(Integer, primary_key=True)
+    instance_id = Column(String(50), unique=True, index=True)
+    name = Column(String(255))
     instance_type = Column(String(50))
-    state         = Column(String(20), index=True)
-    prev_state    = Column(String(20))
-    public_ip     = Column(String(50))
-    private_ip    = Column(String(50))
-    region        = Column(String(20))
-    ami_id        = Column(String(50))
-    launch_time   = Column(DateTime)
+    state = Column(String(20), index=True)
+    prev_state = Column(String(20))
+    public_ip = Column(String(50))
+    private_ip = Column(String(50))
+    region = Column(String(20))
+    ami_id = Column(String(50))
+    launch_time = Column(DateTime)
     security_groups = Column(Text)  # JSON
-    sg_issues     = Column(Text)    # JSON
-    first_seen    = Column(DateTime, default=_utcnow)
-    last_seen     = Column(DateTime)
+    sg_issues = Column(Text)  # JSON
+    first_seen = Column(DateTime, default=_utcnow)
+    last_seen = Column(DateTime)
 
     def to_dict(self):
         return {
-            "id":            self.id,
-            "instance_id":   self.instance_id,
-            "name":          self.name,
+            "id": self.id,
+            "instance_id": self.instance_id,
+            "name": self.name,
             "instance_type": self.instance_type,
-            "state":         self.state,
-            "public_ip":     self.public_ip,
-            "private_ip":    self.private_ip,
-            "region":        self.region,
-            "ami_id":        self.ami_id,
-            "launch_time":   self.launch_time.isoformat() if self.launch_time else None,
+            "state": self.state,
+            "public_ip": self.public_ip,
+            "private_ip": self.private_ip,
+            "region": self.region,
+            "ami_id": self.ami_id,
+            "launch_time": self.launch_time.isoformat() if self.launch_time else None,
             "security_groups": _json.loads(self.security_groups) if self.security_groups else [],
-            "sg_issues":     _json.loads(self.sg_issues) if self.sg_issues else [],
-            "first_seen":    self.first_seen.isoformat() if self.first_seen else None,
-            "last_seen":     self.last_seen.isoformat() if self.last_seen else None,
+            "sg_issues": _json.loads(self.sg_issues) if self.sg_issues else [],
+            "first_seen": self.first_seen.isoformat() if self.first_seen else None,
+            "last_seen": self.last_seen.isoformat() if self.last_seen else None,
         }
 
 
 class DockerContainer(Base):
     __tablename__ = "docker_containers"
 
-    id           = Column(Integer, primary_key=True)
+    id = Column(Integer, primary_key=True)
     container_id = Column(String(50), unique=True, index=True)
-    name         = Column(String(255))
-    image        = Column(String(500))
-    status       = Column(String(20))
-    ports        = Column(Text)   # JSON
-    infra        = Column(Boolean, default=False)
-    issues       = Column(Text)   # JSON
-    first_seen   = Column(DateTime, default=_utcnow)
-    last_seen    = Column(DateTime)
+    name = Column(String(255))
+    image = Column(String(500))
+    status = Column(String(20))
+    ports = Column(Text)  # JSON
+    infra = Column(Boolean, default=False)
+    issues = Column(Text)  # JSON
+    first_seen = Column(DateTime, default=_utcnow)
+    last_seen = Column(DateTime)
 
     def to_dict(self):
         return {
-            "id":           self.id,
+            "id": self.id,
             "container_id": self.container_id,
-            "name":         self.name,
-            "image":        self.image,
-            "status":       self.status,
-            "ports":        _json.loads(self.ports)  if self.ports  else [],
-            "infra":        self.infra,
-            "issues":       _json.loads(self.issues) if self.issues else [],
-            "first_seen":   self.first_seen.isoformat() if self.first_seen else None,
-            "last_seen":    self.last_seen.isoformat()  if self.last_seen  else None,
+            "name": self.name,
+            "image": self.image,
+            "status": self.status,
+            "ports": _json.loads(self.ports) if self.ports else [],
+            "infra": self.infra,
+            "issues": _json.loads(self.issues) if self.issues else [],
+            "first_seen": self.first_seen.isoformat() if self.first_seen else None,
+            "last_seen": self.last_seen.isoformat() if self.last_seen else None,
         }
 
 
 class K8sPod(Base):
     __tablename__ = "k8s_pods"
 
-    id         = Column(Integer, primary_key=True)
-    context    = Column(String(100))
-    namespace  = Column(String(255))
-    name       = Column(String(255))
-    phase      = Column(String(50))
-    restarts   = Column(Integer, default=0)
-    images     = Column(Text)   # JSON
-    node       = Column(String(255))
-    system     = Column(Boolean, default=False)
-    issues     = Column(Text)   # JSON
+    id = Column(Integer, primary_key=True)
+    context = Column(String(100))
+    namespace = Column(String(255))
+    name = Column(String(255))
+    phase = Column(String(50))
+    restarts = Column(Integer, default=0)
+    images = Column(Text)  # JSON
+    node = Column(String(255))
+    system = Column(Boolean, default=False)
+    issues = Column(Text)  # JSON
     first_seen = Column(DateTime, default=_utcnow)
-    last_seen  = Column(DateTime)
+    last_seen = Column(DateTime)
 
     __table_args__ = (UniqueConstraint("context", "namespace", "name"),)
 
     def to_dict(self):
         return {
-            "id":         self.id,
-            "context":    self.context,
-            "namespace":  self.namespace,
-            "name":       self.name,
-            "phase":      self.phase,
-            "restarts":   self.restarts,
-            "images":     _json.loads(self.images)  if self.images  else [],
-            "node":       self.node,
-            "system":     self.system,
-            "issues":     _json.loads(self.issues)  if self.issues  else [],
+            "id": self.id,
+            "context": self.context,
+            "namespace": self.namespace,
+            "name": self.name,
+            "phase": self.phase,
+            "restarts": self.restarts,
+            "images": _json.loads(self.images) if self.images else [],
+            "node": self.node,
+            "system": self.system,
+            "issues": _json.loads(self.issues) if self.issues else [],
             "first_seen": self.first_seen.isoformat() if self.first_seen else None,
-            "last_seen":  self.last_seen.isoformat()  if self.last_seen  else None,
+            "last_seen": self.last_seen.isoformat() if self.last_seen else None,
         }
 
 

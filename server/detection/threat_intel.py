@@ -28,43 +28,68 @@ class ThreatIntel:
 
         # Known crypto miner process names (lowercase substrings)
         self.miner_names: Set[str] = {
-            "xmrig", "minerd", "cpuminer", "t-rex", "phoenixminer", "lolminer",
-            "gminer", "nbminer", "nsfminer", "ethminer", "cgminer", "bfgminer",
-            "claymore", "teamredminer", "wildrig", "srbminer", "kawpowminer",
-            "nanominer", "rigel", "bminer", "excavator", "trex", "minero",
+            "xmrig",
+            "minerd",
+            "cpuminer",
+            "t-rex",
+            "phoenixminer",
+            "lolminer",
+            "gminer",
+            "nbminer",
+            "nsfminer",
+            "ethminer",
+            "cgminer",
+            "bfgminer",
+            "claymore",
+            "teamredminer",
+            "wildrig",
+            "srbminer",
+            "kawpowminer",
+            "nanominer",
+            "rigel",
+            "bminer",
+            "excavator",
+            "trex",
+            "minero",
         }
 
         # Spectrum DNS servers + common public DNS (exact IPs)
         self.trusted_dns: Set[str] = {
-            "75.75.75.75", "75.75.76.76",        # Spectrum
-            "8.8.8.8", "8.8.4.4",               # Google public DNS
-            "1.1.1.1", "1.0.0.1",               # Cloudflare
-            "9.9.9.9", "149.112.112.112",        # Quad9
-            "208.67.222.222", "208.67.220.220",  # OpenDNS
+            "75.75.75.75",
+            "75.75.76.76",  # Spectrum
+            "8.8.8.8",
+            "8.8.4.4",  # Google public DNS
+            "1.1.1.1",
+            "1.0.0.1",  # Cloudflare
+            "9.9.9.9",
+            "149.112.112.112",  # Quad9
+            "208.67.222.222",
+            "208.67.220.220",  # OpenDNS
         }
         # Trusted CIDR ranges — browsers use DNS-over-HTTPS across these,
         # so any DNS traffic to these networks is expected and not suspicious.
         self._trusted_networks = [
-            ipaddress.ip_network(n) for n in [
-                "142.250.0.0/15",   # Google (Chrome DoH, 1e100.net)
-                "172.217.0.0/16",   # Google
-                "172.253.0.0/16",   # Google
-                "173.194.0.0/16",   # Google
-                "192.178.0.0/15",   # Google
+            ipaddress.ip_network(n)
+            for n in [
+                "142.250.0.0/15",  # Google (Chrome DoH, 1e100.net)
+                "172.217.0.0/16",  # Google
+                "172.253.0.0/16",  # Google
+                "173.194.0.0/16",  # Google
+                "192.178.0.0/15",  # Google
                 "216.58.192.0/19",  # Google
-                "104.16.0.0/13",    # Cloudflare CDN / DoH
-                "17.0.0.0/8",       # Apple (Private Relay, DoH)
-                "98.80.0.0/12",     # Amazon (covers 98.80–98.95)
-                "52.0.0.0/8",       # Amazon AWS
-                "54.0.0.0/8",       # Amazon AWS
-                "3.0.0.0/8",        # Amazon AWS
-                "13.32.0.0/12",     # Amazon CloudFront
-                "150.171.0.0/16",   # Microsoft
-                "13.64.0.0/11",     # Microsoft Azure
-                "13.96.0.0/13",     # Microsoft Azure
-                "13.104.0.0/14",    # Microsoft Azure
-                "20.0.0.0/8",       # Microsoft Azure
-                "40.0.0.0/8",       # Microsoft Azure
+                "104.16.0.0/13",  # Cloudflare CDN / DoH
+                "17.0.0.0/8",  # Apple (Private Relay, DoH)
+                "98.80.0.0/12",  # Amazon (covers 98.80–98.95)
+                "52.0.0.0/8",  # Amazon AWS
+                "54.0.0.0/8",  # Amazon AWS
+                "3.0.0.0/8",  # Amazon AWS
+                "13.32.0.0/12",  # Amazon CloudFront
+                "150.171.0.0/16",  # Microsoft
+                "13.64.0.0/11",  # Microsoft Azure
+                "13.96.0.0/13",  # Microsoft Azure
+                "13.104.0.0/14",  # Microsoft Azure
+                "20.0.0.0/8",  # Microsoft Azure
+                "40.0.0.0/8",  # Microsoft Azure
             ]
         ]
 
@@ -72,26 +97,52 @@ class ThreatIntel:
         # high query volume (user-facing services with no meaningful abuse signal
         # from DNS queries alone).
         self._domain_allowlist: Set[str] = {
-            "google.com", "googleapis.com", "gstatic.com",
-            "microsoft.com", "windows.com", "live.com",
-            "apple.com", "icloud.com", "mzstatic.com",
-            "amazon.com", "amazonaws.com",
-            "cloudflare.com", "fastly.net", "akamai.net",
+            "google.com",
+            "googleapis.com",
+            "gstatic.com",
+            "microsoft.com",
+            "windows.com",
+            "live.com",
+            "apple.com",
+            "icloud.com",
+            "mzstatic.com",
+            "amazon.com",
+            "amazonaws.com",
+            "cloudflare.com",
+            "fastly.net",
+            "akamai.net",
         }
 
         # Abused-but-legitimate domains — appear in URLhaus because attackers use
         # their file hosting, but a single query is normal. Alert only on unusual
         # volume (5+ queries in 2 minutes) which suggests automated payload fetching.
         self.abused_domains: Set[str] = {
-            "docs.google.com", "drive.google.com", "sheets.google.com",
-            "slides.google.com", "storage.googleapis.com", "calendar.google.com",
-            "raw.githubusercontent.com", "gist.github.com", "githubusercontent.com",
-            "pastebin.com", "paste.ee", "rentry.co", "hastebin.com",
-            "cdn.discordapp.com", "media.discordapp.net", "discord.com",
-            "dl.dropboxusercontent.com", "dropbox.com",
-            "onedrive.live.com", "1drv.ms",
-            "t.me", "telegram.org",
-            "transfer.sh", "file.io", "gofile.io", "anonfiles.com",
+            "docs.google.com",
+            "drive.google.com",
+            "sheets.google.com",
+            "slides.google.com",
+            "storage.googleapis.com",
+            "calendar.google.com",
+            "raw.githubusercontent.com",
+            "gist.github.com",
+            "githubusercontent.com",
+            "pastebin.com",
+            "paste.ee",
+            "rentry.co",
+            "hastebin.com",
+            "cdn.discordapp.com",
+            "media.discordapp.net",
+            "discord.com",
+            "dl.dropboxusercontent.com",
+            "dropbox.com",
+            "onedrive.live.com",
+            "1drv.ms",
+            "t.me",
+            "telegram.org",
+            "transfer.sh",
+            "file.io",
+            "gofile.io",
+            "anonfiles.com",
         }
 
         # Volume threshold: N queries within WINDOW seconds triggers an alert
@@ -115,13 +166,19 @@ class ThreatIntel:
             if isinstance(r, Exception):
                 logger.warning(f"Threat intel fetch error: {r}")
         self.last_refresh = datetime.utcnow()
-        logger.info(f"Threat intel: {len(self.malicious_ips)} IPs, {len(self.malicious_domains)} domains")
+        logger.info(
+            f"Threat intel: {len(self.malicious_ips)} IPs, {len(self.malicious_domains)} domains"
+        )
 
     async def _fetch_feodo(self, session: aiohttp.ClientSession):
         async with session.get(FEODO_C2_URL, timeout=aiohttp.ClientTimeout(total=30)) as r:
             if r.status == 200:
                 text = await r.text()
-                ips = {line.strip() for line in text.splitlines() if line.strip() and not line.startswith("#")}
+                ips = {
+                    line.strip()
+                    for line in text.splitlines()
+                    if line.strip() and not line.startswith("#")
+                }
                 self.malicious_ips.update(ips)
                 logger.info(f"Feodo: {len(ips)} C2 IPs loaded")
 

@@ -26,18 +26,35 @@ logging.basicConfig(
 )
 logger = logging.getLogger("bobaxdr-sensor")
 
-SERVER   = os.environ.get("BOBAXDR_SERVER", "http://localhost:8000").rstrip("/")
-API_KEY  = os.environ.get("BOBAXDR_API_KEY", "")
+SERVER = os.environ.get("BOBAXDR_SERVER", "http://localhost:8000").rstrip("/")
+API_KEY = os.environ.get("BOBAXDR_API_KEY", "")
 HOSTNAME = socket.gethostname()
 
 _session = requests.Session()
 _session.headers["x-api-key"] = API_KEY
 
 PRIVATE_PREFIXES = (
-    "10.", "127.", "::1", "169.254.",
-    "192.168.", "172.16.", "172.17.", "172.18.", "172.19.", "172.20.",
-    "172.21.", "172.22.", "172.23.", "172.24.", "172.25.", "172.26.",
-    "172.27.", "172.28.", "172.29.", "172.30.", "172.31.",
+    "10.",
+    "127.",
+    "::1",
+    "169.254.",
+    "192.168.",
+    "172.16.",
+    "172.17.",
+    "172.18.",
+    "172.19.",
+    "172.20.",
+    "172.21.",
+    "172.22.",
+    "172.23.",
+    "172.24.",
+    "172.25.",
+    "172.26.",
+    "172.27.",
+    "172.28.",
+    "172.29.",
+    "172.30.",
+    "172.31.",
 )
 
 # Well-known domains and their IP cache for hijack detection
@@ -45,8 +62,12 @@ _dns_baseline: dict[str, str] = {}
 _dns_baseline_lock = threading.Lock()
 
 PROBE_DOMAINS = [
-    "google.com", "cloudflare.com", "amazon.com",
-    "microsoft.com", "apple.com", "github.com",
+    "google.com",
+    "cloudflare.com",
+    "amazon.com",
+    "microsoft.com",
+    "apple.com",
+    "github.com",
 ]
 
 
@@ -94,15 +115,17 @@ def dns_hijack_monitor():
                 cur_oct = current.split(".")[:2]
                 if exp_oct != cur_oct:
                     logger.warning(f"DNS anomaly: {domain} → {current} (baseline: {expected})")
-                    post({
-                        "type": "dns_query",
-                        "hostname": HOSTNAME,
-                        "domain": domain,
-                        "src_ip": "",
-                        "dst_ip": current,
-                        "dst_port": 53,
-                        "note": f"resolved to {current}, baseline was {expected}",
-                    })
+                    post(
+                        {
+                            "type": "dns_query",
+                            "hostname": HOSTNAME,
+                            "domain": domain,
+                            "src_ip": "",
+                            "dst_ip": current,
+                            "dst_port": 53,
+                            "note": f"resolved to {current}, baseline was {expected}",
+                        }
+                    )
                     _dns_baseline[domain] = current
 
 
@@ -130,14 +153,16 @@ def run_scapy():
             if pkt.haslayer(DNS) and pkt.haslayer(DNSQR):
                 domain = pkt[DNSQR].qname.decode("utf-8", errors="ignore").rstrip(".")
                 dst_port = pkt[UDP].dport if pkt.haslayer(UDP) else 53
-                post({
-                    "type": "dns_query",
-                    "hostname": HOSTNAME,
-                    "domain": domain,
-                    "src_ip": src,
-                    "dst_ip": dst,
-                    "dst_port": dst_port,
-                })
+                post(
+                    {
+                        "type": "dns_query",
+                        "hostname": HOSTNAME,
+                        "domain": domain,
+                        "src_ip": src,
+                        "dst_ip": dst,
+                        "dst_port": dst_port,
+                    }
+                )
 
             # ── Inbound TCP SYN scan detection ───────────────────────────────
             if pkt.haslayer(TCP):
@@ -151,12 +176,14 @@ def run_scapy():
                     unique_ports = {p for _, p in syn_state[src]}
                     if len(unique_ports) >= 10:
                         logger.warning(f"Port scan detected from {src} ({len(unique_ports)} ports)")
-                        post({
-                            "type": "port_scan_detected",
-                            "hostname": HOSTNAME,
-                            "src_ip": src,
-                            "ports_scanned": list(unique_ports),
-                        })
+                        post(
+                            {
+                                "type": "port_scan_detected",
+                                "hostname": HOSTNAME,
+                                "src_ip": src,
+                                "ports_scanned": list(unique_ports),
+                            }
+                        )
                         syn_state[src].clear()
         except Exception:
             pass
@@ -207,6 +234,7 @@ def main():
 
     sys.path.insert(0, os.path.dirname(__file__))
     import network_scanner
+
     network_scanner.start(SERVER, API_KEY, HOSTNAME)
 
     # Use packet capture if root, otherwise fall back to connection monitoring
@@ -215,6 +243,7 @@ def main():
     except AttributeError:
         # Windows
         import ctypes
+
         is_root = ctypes.windll.shell32.IsUserAnAdmin() != 0
 
     if is_root:

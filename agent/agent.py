@@ -28,12 +28,12 @@ logging.basicConfig(
 )
 logger = logging.getLogger("bobaxdr-agent")
 
-SERVER       = os.environ.get("BOBAXDR_SERVER", "http://localhost:8000").rstrip("/")
-API_KEY      = os.environ.get("BOBAXDR_API_KEY", "")
-PROC_SECS    = int(os.environ.get("BOBAXDR_PROC_INTERVAL", "30"))
-NET_SECS     = int(os.environ.get("BOBAXDR_NET_INTERVAL", "10"))
-HOSTNAME     = socket.gethostname()
-PLATFORM     = platform.system().lower()
+SERVER = os.environ.get("BOBAXDR_SERVER", "http://localhost:8000").rstrip("/")
+API_KEY = os.environ.get("BOBAXDR_API_KEY", "")
+PROC_SECS = int(os.environ.get("BOBAXDR_PROC_INTERVAL", "30"))
+NET_SECS = int(os.environ.get("BOBAXDR_NET_INTERVAL", "10"))
+HOSTNAME = socket.gethostname()
+PLATFORM = platform.system().lower()
 
 _session = requests.Session()
 _session.headers["x-api-key"] = API_KEY
@@ -66,6 +66,7 @@ def _base() -> dict:
 def process_loop():
     # Warm up CPU percent counters (first call always returns 0)
     import psutil
+
     psutil.cpu_percent(interval=None)
     time.sleep(1)
 
@@ -103,7 +104,7 @@ def main():
 
     threads = [
         threading.Thread(target=process_loop, name="proc", daemon=True),
-        threading.Thread(target=network_loop, name="net",  daemon=True),
+        threading.Thread(target=network_loop, name="net", daemon=True),
     ]
     for t in threads:
         t.start()

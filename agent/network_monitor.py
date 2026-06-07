@@ -31,20 +31,24 @@ def _get_connections_lsof() -> list[dict]:
     conns = []
     # Example line:
     # chrome  1234 user  45u  IPv4 0x1  0t0  TCP 10.0.0.5:52341->142.250.80.46:443 (ESTABLISHED)
-    pattern = re.compile(r"(\S+)\s+(\d+)\s+\S+\s+\S+\s+\S+\s+\S+\s+\S+\s+TCP\s+([\d.]+):(\d+)->([\d.]+):(\d+)")
+    pattern = re.compile(
+        r"(\S+)\s+(\d+)\s+\S+\s+\S+\s+\S+\s+\S+\s+\S+\s+TCP\s+([\d.]+):(\d+)->([\d.]+):(\d+)"
+    )
     for line in out.splitlines():
         m = pattern.search(line)
         if not m:
             continue
         proc, pid, laddr, lport, raddr, rport = m.groups()
-        conns.append({
-            "raddr": raddr,
-            "rport": int(rport),
-            "lport": int(lport),
-            "status": "ESTABLISHED",
-            "pid": int(pid),
-            "process": proc,
-        })
+        conns.append(
+            {
+                "raddr": raddr,
+                "rport": int(rport),
+                "lport": int(lport),
+                "status": "ESTABLISHED",
+                "pid": int(pid),
+                "process": proc,
+            }
+        )
     return conns
 
 
@@ -58,14 +62,16 @@ def _get_connections_psutil() -> list[dict]:
             ip = c.raddr.ip
             if not ip or ip in ("0.0.0.0", "::"):
                 continue
-            conns.append({
-                "raddr": ip,
-                "rport": c.raddr.port,
-                "lport": c.laddr.port if c.laddr else None,
-                "status": c.status,
-                "pid": c.pid,
-                "process": _proc_name(c.pid),
-            })
+            conns.append(
+                {
+                    "raddr": ip,
+                    "rport": c.raddr.port,
+                    "lport": c.laddr.port if c.laddr else None,
+                    "status": c.status,
+                    "pid": c.pid,
+                    "process": _proc_name(c.pid),
+                }
+            )
     except (psutil.AccessDenied, PermissionError) as e:
         logger.debug(f"psutil net_connections: {e}")
     return conns
