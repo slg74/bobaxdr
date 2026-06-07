@@ -28,6 +28,8 @@ BENIGN_PROCESSES = {
     "code", "code helper", "code h",
     # Claude Code — persistent connection to Anthropic API while active
     "claude",
+    # Apple system daemon — Siri/Spotlight/Safari suggestions, regular AWS connections are expected
+    "parsecd",
 }
 
 
