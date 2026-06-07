@@ -57,6 +57,7 @@ class Alert(Base):
     indicator = Column(String(500))
     timestamp = Column(DateTime, default=_utcnow, index=True)
     acknowledged = Column(Boolean, default=False, index=True)
+    raw_data = Column(Text, nullable=True)
 
     def to_dict(self):
         return {
@@ -70,6 +71,7 @@ class Alert(Base):
             "indicator": self.indicator,
             "timestamp": self.timestamp.isoformat() if self.timestamp else None,
             "acknowledged": self.acknowledged,
+            "raw_data": _json.loads(self.raw_data) if self.raw_data else None,
         }
 
 

@@ -147,6 +147,18 @@ tr:hover td { background: rgba(59,130,246,.04); }
   transition: all .1s; white-space: nowrap;
 }
 .ack:hover { border-color: var(--accent); color: var(--accent); }
+.detail-btn {
+  background: none; border: 1px solid var(--border); color: var(--muted);
+  padding: 3px 9px; border-radius: 4px; cursor: pointer; font-size: 11px;
+  transition: all .1s; white-space: nowrap; margin-right: 4px;
+}
+.detail-btn:hover { border-color: var(--high); color: var(--high); }
+/* ── Alert detail modal ── */
+.alert-detail-grid { display: grid; grid-template-columns: 120px 1fr; gap: 8px 14px; padding: 20px; }
+.adg-label { font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: .6px; padding-top: 2px; }
+.adg-value { font-size: 12px; color: var(--text); word-break: break-all; }
+.adg-value.mono { font-family: 'SF Mono','Consolas',monospace; font-size: 11px; }
+.adg-divider { grid-column: 1/-1; border: none; border-top: 1px solid var(--border); margin: 4px 0; }
 
 /* ── Top Talkers ── */
 .talker-ip { font-family: 'SF Mono','Consolas',monospace; font-size: 12px; font-weight: 600; }
@@ -447,6 +459,20 @@ tr:hover td { background: rgba(59,130,246,.04); }
     </div>
   </div>
 
+<!-- ── Alert detail modal ── -->
+<div class="modal-overlay" id="alert-detail-modal" onclick="closeAlertDetail(event)">
+  <div class="modal" style="max-width:540px">
+    <div class="modal-head">
+      <div>
+        <div class="modal-title" id="adm-title">Alert Detail</div>
+        <div class="modal-sub" id="adm-sub"></div>
+      </div>
+      <button class="modal-close" onclick="closeAlertDetailDirect()">✕</button>
+    </div>
+    <div class="modal-body" id="adm-body"></div>
+  </div>
+</div>
+
 <!-- ── Events modal ── -->
 <div class="modal-overlay" id="events-modal" onclick="closeModal(event)">
   <div class="modal">
@@ -550,7 +576,10 @@ function renderAlerts() {
       <td><span class="mono">${esc(a.indicator)}</span></td>
       <td class="t-muted">${esc(a.endpoint_hostname||'network')}</td>
       <td class="t-muted">${ago(a.timestamp)}</td>
-      <td><button class="ack" onclick="ack(${a.id})">Ack</button></td>
+      <td style="white-space:nowrap">
+        ${a.raw_data ? `<button class="detail-btn" onclick="showAlertDetail(${a.id})">Detail</button>` : ''}
+        <button class="ack" onclick="ack(${a.id})">Ack</button>
+      </td>
     </tr>`).join('');
 
   el.innerHTML = `<table>
@@ -715,6 +744,55 @@ async function resolveIP(ip, uid) {
 }
 
 // ── Actions ───────────────────────────────────────────────────
+function showAlertDetail(id) {
+  const a = allAlerts.find(x => x.id === id);
+  if (!a) return;
+  document.getElementById('adm-title').textContent = a.title;
+  document.getElementById('adm-sub').textContent = `${a.rule_name} · ${a.endpoint_hostname || 'network'} · ${ago(a.timestamp)}`;
+
+  const rows = [
+    ['Severity',   `<span class="badge b-${a.severity}">${a.severity}</span>`],
+    ['Rule',       `<span class="mono">${esc(a.rule_name)}</span>`],
+    ['Endpoint',   esc(a.endpoint_hostname || 'network')],
+    ['Indicator',  `<span class="adg-value mono">${esc(a.indicator)}</span>`],
+    ['Description', esc(a.description)],
+    ['Time',       esc(a.timestamp)],
+  ];
+
+  let html = '<div class="alert-detail-grid">';
+  for (const [label, val] of rows) {
+    html += `<div class="adg-label">${label}</div><div class="adg-value">${val}</div>`;
+  }
+
+  if (a.raw_data) {
+    const d = a.raw_data;
+    html += `<hr class="adg-divider"><div class="adg-label" style="grid-column:1/-1;font-size:10px;text-transform:uppercase;letter-spacing:.8px;color:var(--muted);margin-bottom:-4px">Process Context</div>`;
+    const prows = [
+      ['Process',     esc(d.process ?? '—')],
+      ['PID',         d.pid != null ? String(d.pid) : '—'],
+      ['Remote IP',   `<span class="adg-value mono">${esc(d.remote_ip ?? '—')}</span>`],
+      ['Remote Port', d.remote_port != null ? String(d.remote_port) : '—'],
+      ['Local Port',  d.local_port != null ? String(d.local_port) : '—'],
+      ['Conn Status', esc(d.status ?? '—')],
+      ['Detected At', esc(d.detected_at ?? '—')],
+    ];
+    for (const [label, val] of prows) {
+      html += `<div class="adg-label">${label}</div><div class="adg-value">${val}</div>`;
+    }
+  }
+
+  html += '</div>';
+  document.getElementById('adm-body').innerHTML = html;
+  document.getElementById('alert-detail-modal').classList.add('open');
+}
+
+function closeAlertDetail(e) {
+  if (e.target === document.getElementById('alert-detail-modal')) closeAlertDetailDirect();
+}
+function closeAlertDetailDirect() {
+  document.getElementById('alert-detail-modal').classList.remove('open');
+}
+
 async function ack(id) {
   await api(`/api/alerts/${id}/acknowledge`, {method:'PUT'});
   await refresh();

@@ -1,3 +1,4 @@
+import json
 import logging
 from collections import defaultdict, deque
 from datetime import datetime, timedelta
@@ -157,6 +158,26 @@ class DetectionEngine:
                 self._check_beaconing(db, endpoint_id, hostname, key, dst_ip, proc)
                 proc_dst[proc].add((dst_ip, dst_port))
 
+            # Tor relay connection: port 9001 (OR) or 9030 (dir) are Tor-specific;
+            # unknown/unnamed process escalates to critical — no legitimate app hides its name
+            if dst_port in (9001, 9030):
+                pid = c.get("pid")
+                sev = "critical" if proc == "unknown" else "high"
+                raw = json.dumps({
+                    "process": proc,
+                    "pid": pid,
+                    "remote_ip": dst_ip,
+                    "remote_port": dst_port,
+                    "local_port": c.get("lport"),
+                    "status": c.get("status"),
+                    "detected_at": now.isoformat(),
+                })
+                self._alert(db, endpoint_id, hostname, "TOR_RELAY_CONNECTION", sev,
+                            "Outbound connection to Tor relay port",
+                            f"'{proc}' (PID {pid}) connected to {dst_ip}:{dst_port} (Tor OR/directory port)",
+                            f"{dst_ip}:{dst_port}",
+                            raw_data=raw)
+
         # Outbound port scan heuristic: one process hitting many unique targets fast
         for proc, targets in proc_dst.items():
             if len(targets) > 20:
@@ -241,7 +262,8 @@ class DetectionEngine:
                         dst_ip)
 
     def _alert(self, db: Session, endpoint_id: int, hostname: str,
-               rule: str, severity: str, title: str, description: str, indicator: str):
+               rule: str, severity: str, title: str, description: str, indicator: str,
+               raw_data: str = None):
         window = datetime.utcnow() - timedelta(minutes=DEDUP_WINDOW_MINUTES)
         exists = db.query(Alert).filter(
             Alert.endpoint_id == endpoint_id,
@@ -262,7 +284,15 @@ class DetectionEngine:
             description=description,
             indicator=indicator,
             timestamp=datetime.utcnow(),
+            raw_data=raw_data,
         )
         db.add(a)
         db.commit()
-        logger.warning(f"[ALERT:{severity.upper()}] {title} | host={hostname} | {indicator}")
+        extra = ""
+        if raw_data:
+            try:
+                d = json.loads(raw_data)
+                extra = f" | pid={d.get('pid')} proc={d.get('process')}"
+            except Exception:
+                pass
+        logger.warning(f"[ALERT:{severity.upper()}] {title} | host={hostname} | {indicator}{extra}")

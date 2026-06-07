@@ -16,6 +16,7 @@ from fastapi import FastAPI, Depends, HTTPException, Header, BackgroundTasks, Re
 from fastapi.responses import HTMLResponse
 from fastapi.staticfiles import StaticFiles
 from sqlalchemy.orm import Session
+from sqlalchemy import text
 
 sys.path.insert(0, os.path.dirname(__file__))
 
@@ -112,6 +113,12 @@ STATIC_DIR = os.path.join(os.path.dirname(__file__), "static")
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     Base.metadata.create_all(bind=engine)
+    # Add raw_data column if upgrading from older schema
+    with engine.connect() as _c:
+        cols = [r[1] for r in _c.execute(text("PRAGMA table_info(alerts)"))]
+        if "raw_data" not in cols:
+            _c.execute(text("ALTER TABLE alerts ADD COLUMN raw_data TEXT"))
+            _c.commit()
     try:
         await threat_intel.refresh()
     except Exception as e:
