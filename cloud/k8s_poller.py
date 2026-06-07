@@ -34,6 +34,10 @@ SYSTEM_NS = {"kube-system", "kube-public", "kube-node-lease",
 
 SENSITIVE_HOST_PATHS = {"/etc", "/var/run/docker.sock", "/proc", "/sys", "/root"}
 
+# Core system containers that legitimately require privileged mode — not actionable findings
+PRIVILEGED_WHITELIST = {"kube-proxy", "kube-apiserver", "etcd", "kube-scheduler",
+                        "kube-controller-manager", "kindnet-cni", "install-cni"}
+
 
 def _pod_issues(pod) -> list[dict]:
     issues = []
@@ -49,7 +53,7 @@ def _pod_issues(pod) -> list[dict]:
     for c in (spec.containers or []):
         sc = c.security_context
         if sc:
-            if sc.privileged:
+            if sc.privileged and c.name not in PRIVILEGED_WHITELIST:
                 issues.append({"severity": "critical",
                                "description": f"Container '{c.name}' running privileged"})
             if sc.run_as_user == 0:
