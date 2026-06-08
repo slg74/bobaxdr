@@ -60,6 +60,13 @@ BENIGN_PROCESSES = {
     "claude",
     # Apple system daemon — Siri/Spotlight/Safari suggestions, regular AWS connections are expected
     "parsecd",
+    # Adobe — background daemons beacon to Fastly CDN for license checks and update sync;
+    # process names are truncated by psutil to ~15 chars so we match on prefix via _is_benign
+    "adobe",
+    "adobereso",
+    "adobeupdate",
+    "adobecrashdaemon",
+    "adobeipcbroker",
 }
 
 
