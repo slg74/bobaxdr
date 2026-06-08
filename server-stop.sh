@@ -20,3 +20,8 @@ stop_pid "k8s poller"    /tmp/bobaxdr-k8s.pid
 stop_pid "Docker poller" /tmp/bobaxdr-docker.pid
 stop_pid "AWS poller"    /tmp/bobaxdr-aws.pid
 stop_pid "Server"        /tmp/bobaxdr-server.pid
+
+# Kill any orphaned poller/server processes not captured by PID files
+pkill -f "k8s_poller.py"    2>/dev/null
+pkill -f "docker_poller.py" 2>/dev/null
+pkill -f "aws_poller.py"    2>/dev/null
