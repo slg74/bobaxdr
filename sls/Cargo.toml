@@ -1,0 +1,12 @@
+[package]
+name = "sls"
+version = "0.1.0"
+edition = "2021"
+
+[[bin]]
+name = "sls"
+path = "src/main.rs"
+
+[dependencies]
+reqwest = { version = "0.11", features = ["blocking", "json"] }
+serde_json = "1"
