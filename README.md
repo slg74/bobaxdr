@@ -8,7 +8,7 @@ A home-use Extended Detection and Response (XDR) system that monitors your entir
 - **Kubernetes** — pod inventory across all namespaces, CrashLoopBackOff detection, privileged pods, hostNetwork/hostPID, sensitive volume mounts, exposed NodePort/LoadBalancer services
 - **Docker** — running containers, privileged containers, host network mode, sensitive path mounts, ports bound to 0.0.0.0
 
-Built for Spectrum internet. Inspired by Palo Alto Cortex XDR.
+Compatible with any home internet provider (Spectrum, Google Fiber, AT&T U-verse, and others). Inspired by Palo Alto Cortex XDR.
 
 ![BobaxDR Dashboard](bobaxdr_ss.png)
 
@@ -220,7 +220,7 @@ The web dashboard at **http://localhost:8000** shows:
 | `PORT_SCAN_INBOUND` | High | 10+ TCP SYN packets from the same external IP to different ports within 60s |
 | `PORT_SCAN_OUTBOUND` | Medium | A single process hitting 20+ unique external targets in one reporting interval |
 | `DNS_TUNNELING` | Medium | DNS query sent to a non-standard port (not 53 / 853 / 5353) |
-| `SUSPICIOUS_DNS_SERVER` | Medium | DNS routed to an unrecognized external server (not Spectrum 75.75.75.75/76, Google, Cloudflare, etc.) |
+| `SUSPICIOUS_DNS_SERVER` | Medium | DNS routed to an unrecognized external server (trusted: Spectrum, Google Fiber, AT&T U-verse, Google Public DNS, Cloudflare, Quad9, OpenDNS) |
 | `TOR_RELAY_CONNECTION` | Critical / High | Outbound connection to a known Tor OR port (9001) or directory port (9030). Escalates to Critical when the connecting process is unnamed/unknown — a named process connecting to Tor is High |
 | `SUSPICIOUS_PROCESS_PATH` | High | Executable running from /tmp, Downloads, AppData Temp, or /dev/shm |
 
@@ -386,7 +386,7 @@ aws ec2 authorize-security-group-ingress --region us-east-1 \
     --protocol tcp --port 22 --cidr $(curl -s -4 ifconfig.me)/32
 ```
 
-> **Note:** Spectrum assigns dynamic IPs. If your home IP changes you'll lose SSH access and need to update the rule. See the Session Manager section below for a more permanent fix.
+> **Note:** Most home ISPs (Spectrum, Google Fiber, AT&T U-verse) assign dynamic IPs. If your home IP changes you'll lose SSH access and need to update the rule. See the Session Manager section below for a more permanent fix.
 
 ### Lock RDP (port 3389) to your home IP only
 

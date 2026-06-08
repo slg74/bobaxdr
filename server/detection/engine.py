@@ -387,7 +387,7 @@ class DetectionEngine:
                 "SUSPICIOUS_DNS_SERVER",
                 "medium",
                 "DNS query to unrecognized external server",
-                f"DNS request for '{domain}' sent to {dst_ip} (not Spectrum or common public DNS)",
+                f"DNS request for '{domain}' sent to {dst_ip} (not a recognized ISP or public DNS resolver)",
                 dst_ip,
             )
 

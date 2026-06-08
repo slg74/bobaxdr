@@ -53,12 +53,14 @@ class ThreatIntel:
             "minero",
         }
 
-        # Spectrum DNS servers + common public DNS (exact IPs)
+        # ISP-assigned and common public DNS resolvers
         self.trusted_dns: Set[str] = {
             "75.75.75.75",
             "75.75.76.76",  # Spectrum
+            "68.94.156.1",
+            "68.94.157.1",  # AT&T U-verse
             "8.8.8.8",
-            "8.8.4.4",  # Google public DNS
+            "8.8.4.4",  # Google (also Google Fiber)
             "1.1.1.1",
             "1.0.0.1",  # Cloudflare
             "9.9.9.9",
