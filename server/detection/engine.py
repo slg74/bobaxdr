@@ -92,6 +92,11 @@ SUSPICIOUS_PATHS = [
     "/library/caches/",
 ]
 
+# Path prefixes that are legitimately under SUSPICIOUS_PATHS but are known-safe
+SAFE_PATH_PREFIXES = [
+    "/private/tmp/pkinstallsandbox",  # Apple PackageKit installer sandbox
+]
+
 # Private IP prefixes
 PRIVATE_PREFIXES = (
     "10.",
@@ -189,19 +194,21 @@ class DetectionEngine:
 
             # Suspicious executable path
             if exe:
-                for bad in SUSPICIOUS_PATHS:
-                    if bad in exe:
-                        self._alert(
-                            db,
-                            endpoint_id,
-                            hostname,
-                            "SUSPICIOUS_PROCESS_PATH",
-                            "high",
-                            "Process executing from suspicious path",
-                            f"'{name}' (PID {p.get('pid')}) running from: {p.get('exe')}",
-                            p.get("exe", ""),
-                        )
-                        break
+                exe_lower = exe.lower()
+                if not any(exe_lower.startswith(s) for s in SAFE_PATH_PREFIXES):
+                    for bad in SUSPICIOUS_PATHS:
+                        if bad in exe:
+                            self._alert(
+                                db,
+                                endpoint_id,
+                                hostname,
+                                "SUSPICIOUS_PROCESS_PATH",
+                                "high",
+                                "Process executing from suspicious path",
+                                f"'{name}' (PID {p.get('pid')}) running from: {p.get('exe')}",
+                                p.get("exe", ""),
+                            )
+                            break
 
             # High CPU + connection to mining port = heuristic miner
             if cpu > 85 and not _is_benign(name):
