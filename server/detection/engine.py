@@ -67,6 +67,9 @@ BENIGN_PROCESSES = {
     "adobeupdate",
     "adobecrashdaemon",
     "adobeipcbroker",
+    # New Relic infrastructure agent — beacons to collector on a regular interval
+    "newrelic-infra",
+    "newrelic-infra-",
 }
 
 
@@ -127,7 +130,9 @@ DEDUP_WINDOW_MINUTES = 10
 
 
 def _is_private(ip: str) -> bool:
-    return any(ip.startswith(p) for p in PRIVATE_PREFIXES)
+    # Strip IPv4-mapped IPv6 prefix (::ffff:10.1.2.3 → 10.1.2.3) before matching
+    addr = ip.removeprefix("::ffff:")
+    return any(addr.startswith(p) for p in PRIVATE_PREFIXES)
 
 
 class DetectionEngine:

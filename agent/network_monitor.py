@@ -1,3 +1,4 @@
+import os
 import sys
 import logging
 import subprocess
@@ -12,7 +13,16 @@ def _proc_name(pid: int | None) -> str:
     if not pid:
         return "unknown"
     try:
-        return psutil.Process(pid).name()
+        p = psutil.Process(pid)
+        # On Linux, name() is capped at 15 chars by the kernel; use exe() for the full name
+        if sys.platform != "darwin":
+            try:
+                exe = p.exe()
+                if exe:
+                    return os.path.basename(exe)
+            except (psutil.AccessDenied, OSError):
+                pass
+        return p.name()
     except (psutil.NoSuchProcess, psutil.AccessDenied):
         return "unknown"
 
