@@ -1,3 +1,4 @@
+import ipaddress
 import json
 import logging
 from collections import defaultdict, deque
@@ -135,6 +136,26 @@ def _is_private(ip: str) -> bool:
     return any(addr.startswith(p) for p in PRIVATE_PREFIXES)
 
 
+# Known monitoring/telemetry service IP ranges — suppress beaconing false positives
+# even when the process can't be identified (agent running without root)
+_BENIGN_DESTINATION_NETWORKS = [
+    # New Relic — infrastructure agent, APM, telemetry ingest (docs.newrelic.com/docs/new-relic-solutions/get-started/networks/)
+    ipaddress.ip_network("162.247.240.0/22"),
+    ipaddress.ip_network("152.38.128.0/19"),
+    ipaddress.ip_network("185.221.84.0/22"),
+    ipaddress.ip_network("212.32.0.0/20"),
+    ipaddress.ip_network("64.251.192.0/20"),
+]
+
+
+def _is_benign_destination(ip: str) -> bool:
+    try:
+        addr = ipaddress.ip_address(ip.removeprefix("::ffff:"))
+        return any(addr in net for net in _BENIGN_DESTINATION_NETWORKS)
+    except ValueError:
+        return False
+
+
 class DetectionEngine:
     def __init__(self, threat_intel: ThreatIntel):
         self.ti = threat_intel
@@ -256,8 +277,8 @@ class DetectionEngine:
                     dst_ip,
                 )
 
-            # Beaconing + scan detection — skip known-benign processes
-            if not _is_benign(proc):
+            # Beaconing + scan detection — skip known-benign processes and destinations
+            if not _is_benign(proc) and not _is_benign_destination(dst_ip):
                 key = (hostname, dst_ip, proc)
                 self._beacon[key].append(now)
                 self._check_beaconing(db, endpoint_id, hostname, key, dst_ip, proc)
