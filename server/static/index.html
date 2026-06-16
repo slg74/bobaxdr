@@ -67,7 +67,7 @@ main { padding: 24px 28px; max-width: 1440px; margin: 0 auto; }
 .card-sub { font-size: 11px; color: var(--muted); margin-top: 6px; }
 
 /* ── 2-col grid ── */
-.layout { display: grid; grid-template-columns: 1fr 360px; gap: 14px; }
+.layout { display: grid; grid-template-columns: 1fr 400px; gap: 14px; }
 
 /* ── Panel ── */
 .panel { background: var(--surface); border: 1px solid var(--border); border-radius: 10px; overflow: hidden; }
@@ -82,6 +82,9 @@ main { padding: 24px 28px; max-width: 1440px; margin: 0 auto; }
   border-radius: 10px; padding: 2px 9px; font-size: 11px; color: var(--muted);
   align-self: center; margin-right: 14px;
 }
+
+/* ── Panel scroll body ── */
+.panel-scroll { max-height: 220px; overflow-y: auto; }
 
 /* ── Panel tabs ── */
 .tab-bar { display: flex; align-items: stretch; flex: 1; }
@@ -135,7 +138,8 @@ tr:hover td { background: rgba(59,130,246,.04); }
 
 /* ── Alert cells ── */
 .alert-title { font-size: 13px; line-height: 1.4; }
-.alert-desc  { font-size: 11px; color: var(--muted); margin-top: 3px; max-width: 380px; line-height: 1.5; }
+.alert-desc  { font-size: 11px; color: var(--muted); margin-top: 3px; max-width: 420px; line-height: 1.5; }
+.alert-indicator { font-family: 'SF Mono', 'Consolas', monospace; font-size: 11px; color: #94a3b8; margin-top: 4px; }
 .mono { font-family: 'SF Mono', 'Consolas', monospace; font-size: 11px; color: #94a3b8; }
 .t-muted { color: var(--muted); font-size: 11px; white-space: nowrap; }
 .rule { font-size: 10px; font-family: monospace; color: var(--muted); }
@@ -364,7 +368,6 @@ tr:hover td { background: rgba(59,130,246,.04); }
     <!-- ── Left: Alerts + Top Talkers ── -->
     <div>
       <div class="panel">
-        <!-- Tab bar -->
         <div class="panel-head">
           <div class="tab-bar">
             <button class="ptab on" data-tab="alerts">Security Alerts</button>
@@ -373,7 +376,6 @@ tr:hover td { background: rgba(59,130,246,.04); }
           <span class="count-badge" id="main-count">0</span>
         </div>
 
-        <!-- Alerts: filter bar + content -->
         <div id="tab-alerts">
           <div class="filters">
             <button class="flt on" data-f="all">All</button>
@@ -386,43 +388,44 @@ tr:hover td { background: rgba(59,130,246,.04); }
           <div id="alerts-body"><div class="empty">Loading…</div></div>
         </div>
 
-        <!-- Top Talkers content (hidden initially) -->
         <div id="tab-talkers" style="display:none">
           <div id="talkers-body"><div class="empty">Loading…</div></div>
         </div>
       </div>
     </div>
 
-    <!-- ── Right column ── -->
+    <!-- ── Right sidebar ── -->
     <div>
+
+      <!-- Network Devices -->
       <div class="panel">
         <div class="panel-head">
           <span class="panel-title">Network Devices</span>
           <span class="count-badge" id="dev-count">0</span>
         </div>
-        <div id="dev-body"><div class="empty">No scan results yet.<br>Start the sensor to discover devices.</div></div>
+        <div id="dev-body" class="panel-scroll">
+          <div class="empty">No scan results yet.<br>Start the sensor to discover devices.</div>
+        </div>
       </div>
 
+      <!-- Endpoints + Pollers (tabbed) -->
       <div class="panel">
         <div class="panel-head">
-          <span class="panel-title">Endpoints</span>
+          <div class="tab-bar">
+            <button class="ptab on" data-stab="agents" onclick="switchSidebarTab('agents')">Endpoints</button>
+            <button class="ptab"    data-stab="pollers" onclick="switchSidebarTab('pollers')">Pollers</button>
+          </div>
           <span class="count-badge" id="ep-count">0</span>
         </div>
-        <div id="ep-body">
+        <div id="stab-agents" class="panel-scroll">
           <div class="empty">No endpoints yet.<br>Start the agent on your devices.</div>
         </div>
-      </div>
-
-      <div class="panel">
-        <div class="panel-head">
-          <span class="panel-title">Pollers</span>
-          <span class="count-badge" id="poller-count">0</span>
-        </div>
-        <div id="poller-body">
+        <div id="stab-pollers" class="panel-scroll" style="display:none">
           <div class="empty">No pollers running.</div>
         </div>
       </div>
 
+      <!-- Threat Intelligence -->
       <div class="panel">
         <div class="panel-head">
           <span class="panel-title">Threat Intelligence</span>
@@ -431,43 +434,38 @@ tr:hover td { background: rgba(59,130,246,.04); }
         <div id="ti-body"><div class="empty">Loading…</div></div>
         <div id="ti-ips-list" style="display:none"></div>
       </div>
-    </div>
 
+    </div>
   </div><!-- /layout -->
 
-  <!-- ── AWS Cloud panel (full width) ── -->
+  <!-- ── Infrastructure: AWS + Docker + K8s (tabbed, full width) ── -->
   <div class="panel" style="margin-top:14px">
     <div class="panel-head">
       <div class="tab-bar">
-        <span class="ptab on" style="cursor:default">AWS EC2 — us-east-1</span>
+        <button class="ptab on" data-itab="aws"    onclick="switchInfraTab('aws')">AWS EC2 — us-east-1</button>
+        <button class="ptab"    data-itab="docker" onclick="switchInfraTab('docker')">Docker</button>
+        <button class="ptab"    data-itab="k8s"    onclick="switchInfraTab('k8s')">Kubernetes · kind-kind</button>
       </div>
-      <span class="count-badge" id="cloud-count">0</span>
+      <span class="count-badge" id="infra-count">0</span>
     </div>
-    <div id="cloud-body"><div class="empty">No instances yet — start the AWS poller.</div></div>
-  </div>
 
-</main>
+    <div id="itab-aws">
+      <div id="cloud-body"><div class="empty">No instances yet — start the AWS poller.</div></div>
+    </div>
 
-  <!-- ── Docker + K8s panels ── -->
-  <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-top:14px">
-    <div class="panel">
-      <div class="panel-head">
-        <div class="tab-bar"><span class="ptab on" style="cursor:default">Docker Containers</span></div>
-        <span class="count-badge" id="docker-count">0</span>
-      </div>
+    <div id="itab-docker" style="display:none">
       <div id="docker-body"><div class="empty">No containers — start the Docker poller.</div></div>
     </div>
-    <div class="panel">
-      <div class="panel-head">
-        <div class="tab-bar"><span class="ptab on" style="cursor:default">Kubernetes · kind-kind</span></div>
-        <span class="count-badge" id="k8s-count">0</span>
-      </div>
-      <div class="filters" style="gap:14px;font-size:11px;color:var(--muted);padding:8px 18px">
+
+    <div id="itab-k8s" style="display:none">
+      <div class="filters" style="gap:14px;font-size:11px;color:var(--muted);padding:8px 18px;border-bottom:1px solid var(--border)">
         <label><input type="checkbox" id="k8s-hide-sys" checked onchange="renderK8s()"> Hide system pods</label>
       </div>
       <div id="k8s-body"><div class="empty">No pods — start the K8s poller.</div></div>
     </div>
   </div>
+
+</main>
 
 <!-- ── Alert detail modal ── -->
 <div class="modal-overlay" id="alert-detail-modal" onclick="closeAlertDetail(event)">
@@ -505,11 +503,16 @@ tr:hover td { background: rgba(59,130,246,.04); }
 
 <script>
 const KEY = '__API_KEY__';
-let allAlerts = [];
+let allAlerts  = [];
 let allTalkers = [];
-let curFilter = 'all';
-let curTab = 'alerts';
+let curFilter  = 'all';
+let curTab     = 'alerts';
 let tiIpsVisible = false;
+
+let curSideTab  = 'agents';
+let curInfraTab = 'aws';
+let _agentCount = 0, _pollerCount = 0;
+let _cloudCount = 0, _dockerCount = 0, _k8sCount = 0;
 
 async function api(path, opts) {
   const r = await fetch(path, { headers: {'x-api-key': KEY}, ...opts });
@@ -534,11 +537,11 @@ function badge(sev) {
   return `<span class="badge b-${sev||'info'}">${sev||'info'}</span>`;
 }
 
-// ── Tab switching ─────────────────────────────────────────────
-document.querySelectorAll('.ptab').forEach(btn => {
+// ── Main tab switching (Alerts / Top Talkers) ─────────────────
+document.querySelectorAll('.ptab[data-tab]').forEach(btn => {
   btn.addEventListener('click', () => {
     curTab = btn.dataset.tab;
-    document.querySelectorAll('.ptab').forEach(b => b.classList.remove('on'));
+    document.querySelectorAll('.ptab[data-tab]').forEach(b => b.classList.remove('on'));
     btn.classList.add('on');
     document.getElementById('tab-alerts').style.display  = curTab === 'alerts'  ? '' : 'none';
     document.getElementById('tab-talkers').style.display = curTab === 'talkers' ? '' : 'none';
@@ -553,6 +556,27 @@ function updateMainCount() {
   } else {
     document.getElementById('main-count').textContent = allTalkers.length;
   }
+}
+
+// ── Sidebar tab switching (Endpoints / Pollers) ───────────────
+function switchSidebarTab(tab) {
+  curSideTab = tab;
+  document.querySelectorAll('[data-stab]').forEach(b =>
+    b.classList.toggle('on', b.dataset.stab === tab));
+  document.getElementById('stab-agents').style.display  = tab === 'agents'  ? '' : 'none';
+  document.getElementById('stab-pollers').style.display = tab === 'pollers' ? '' : 'none';
+  document.getElementById('ep-count').textContent = tab === 'agents' ? _agentCount : _pollerCount;
+}
+
+// ── Infra tab switching (AWS / Docker / K8s) ──────────────────
+function switchInfraTab(tab) {
+  curInfraTab = tab;
+  document.querySelectorAll('[data-itab]').forEach(b =>
+    b.classList.toggle('on', b.dataset.itab === tab));
+  ['aws', 'docker', 'k8s'].forEach(t =>
+    document.getElementById('itab-' + t).style.display = t === tab ? '' : 'none');
+  document.getElementById('infra-count').textContent =
+    ({ aws: _cloudCount, docker: _dockerCount, k8s: _k8sCount })[tab];
 }
 
 // ── Alert filter buttons ──────────────────────────────────────
@@ -582,8 +606,8 @@ function renderAlerts() {
       <td>
         <div class="alert-title">${esc(a.title)}</div>
         <div class="alert-desc">${esc(a.description)}</div>
+        ${a.indicator ? `<div class="alert-indicator">${esc(a.indicator)}</div>` : ''}
       </td>
-      <td><span class="mono">${esc(a.indicator)}</span></td>
       <td class="t-muted">${esc(a.endpoint_hostname||'network')}</td>
       <td class="t-muted">${ago(a.timestamp)}</td>
       <td style="white-space:nowrap">
@@ -594,7 +618,7 @@ function renderAlerts() {
 
   el.innerHTML = `<table>
     <thead><tr>
-      <th>Severity</th><th>Alert</th><th>Indicator</th>
+      <th>Severity</th><th>Alert</th>
       <th>Endpoint</th><th>Time</th><th></th>
     </tr></thead>
     <tbody>${rows}</tbody>
@@ -615,9 +639,9 @@ function renderTalkers() {
 
   const rows = allTalkers.map(t => {
     const barPct = Math.round((t.count / maxCount) * 100);
-    const isBad = t.is_malicious;
-    const tags = arr => arr.map(v => `<span class="tag">${esc(v)}</span>`).join('');
-    const uid = 'r-' + t.ip.replace(/[.:]/g, '-');
+    const isBad  = t.is_malicious;
+    const tags   = arr => arr.map(v => `<span class="tag">${esc(v)}</span>`).join('');
+    const uid    = 'r-' + t.ip.replace(/[.:]/g, '-');
 
     return `<tr>
       <td>
@@ -654,33 +678,40 @@ function renderEndpoints(eps) {
   const agents  = eps.filter(e => !POLLER_PLATFORMS.has(e.platform));
   const pollers = eps.filter(e =>  POLLER_PLATFORMS.has(e.platform));
 
-  // ── Agents ──
-  document.getElementById('ep-count').textContent = agents.length;
-  const el = document.getElementById('ep-body');
-  el.innerHTML = agents.length ? agents.map(e => `
-    <div class="ep-row">
-      <div class="ep-info">
-        <span class="ep-dot ${e.online?'on':'off'}"></span>
-        <strong>${esc(e.hostname)}</strong>
-        <small>${esc(e.platform)} · ${esc(e.ip_address||'unknown IP')}</small>
-      </div>
-      <span class="t-muted">${ago(e.last_seen)}</span>
-    </div>`).join('')
-  : '<div class="empty">No endpoints registered yet.<br>Start the agent on your devices.</div>';
+  _agentCount  = agents.length;
+  _pollerCount = pollers.length;
 
-  // ── Pollers ──
-  document.getElementById('poller-count').textContent = pollers.length;
-  const pl = document.getElementById('poller-body');
-  pl.innerHTML = pollers.length ? pollers.map(e => `
-    <div class="ep-row">
-      <div class="ep-info">
-        <span class="ep-dot ${e.online?'on':'off'}"></span>
-        <strong>${esc(e.hostname)}</strong>
-        <small>${esc(POLLER_LABELS[e.platform] || e.platform)}</small>
-      </div>
-      <span class="t-muted">${ago(e.last_seen)}</span>
-    </div>`).join('')
-  : '<div class="empty">No pollers running.</div>';
+  // Update stat card
+  document.getElementById('s-ep').textContent = agents.filter(e => e.online).length;
+  document.getElementById('s-ep-sub').textContent = `of ${agents.length} total`;
+
+  // Agents tab
+  document.getElementById('stab-agents').innerHTML = agents.length
+    ? agents.map(e => `
+        <div class="ep-row">
+          <div class="ep-info">
+            <span class="ep-dot ${e.online?'on':'off'}"></span>
+            <strong>${esc(e.hostname)}</strong>
+            <small>${esc(e.platform)} · ${esc(e.ip_address||'unknown IP')}</small>
+          </div>
+          <span class="t-muted">${ago(e.last_seen)}</span>
+        </div>`).join('')
+    : '<div class="empty">No endpoints yet.<br>Start the agent on your devices.</div>';
+
+  // Pollers tab
+  document.getElementById('stab-pollers').innerHTML = pollers.length
+    ? pollers.map(e => `
+        <div class="ep-row">
+          <div class="ep-info">
+            <span class="ep-dot ${e.online?'on':'off'}"></span>
+            <strong>${esc(e.hostname)}</strong>
+            <small>${esc(POLLER_LABELS[e.platform] || e.platform)}</small>
+          </div>
+          <span class="t-muted">${ago(e.last_seen)}</span>
+        </div>`).join('')
+    : '<div class="empty">No pollers running.</div>';
+
+  document.getElementById('ep-count').textContent = curSideTab === 'agents' ? _agentCount : _pollerCount;
 }
 
 // ── Render: Threat Intel ──────────────────────────────────────
@@ -702,14 +733,13 @@ function renderTI(ti) {
     <div class="ti-row"><span class="ti-label">Sources</span>
       <span class="ti-val" style="font-size:11px;color:var(--muted)">Feodo Tracker · URLhaus</span></div>`;
 
-  // Keep the IPs list visible state if it was open
   if (tiIpsVisible) loadAndShowIPs();
 }
 
 async function toggleIPs() {
   tiIpsVisible = !tiIpsVisible;
   const listEl = document.getElementById('ti-ips-list');
-  const btn = document.getElementById('ips-btn');
+  const btn    = document.getElementById('ips-btn');
   if (!tiIpsVisible) {
     listEl.style.display = 'none';
     if (btn) btn.textContent = 'Show ▾';
@@ -720,9 +750,9 @@ async function toggleIPs() {
 
 async function loadAndShowIPs() {
   const listEl = document.getElementById('ti-ips-list');
-  const btn = document.getElementById('ips-btn');
+  const btn    = document.getElementById('ips-btn');
   try {
-    const ips = await api('/api/threat-intel/ips');
+    const ips   = await api('/api/threat-intel/ips');
     const items = ips.map(ip => {
       const uid = 'r-' + ip.replace(/[.:]/g, '-');
       return `<span class="ti-ip">
@@ -748,7 +778,6 @@ async function resolveIP(ip, uid) {
   const el = document.getElementById(uid);
   if (!el) return;
 
-  // Toggle off if already resolved
   if (el.dataset.state === 'on') {
     el.textContent = '';
     el.dataset.state = 'off';
@@ -761,7 +790,7 @@ async function resolveIP(ip, uid) {
 
   try {
     const cached = _rdnsCache[ip];
-    const data = cached ?? await api(`/api/resolve/${encodeURIComponent(ip)}`);
+    const data   = cached ?? await api(`/api/resolve/${encodeURIComponent(ip)}`);
     if (!cached) _rdnsCache[ip] = data;
     el.className = 'rdns resolved';
     el.textContent = `↩ ${data.hostname}`;
@@ -779,12 +808,12 @@ function showAlertDetail(id) {
   document.getElementById('adm-sub').textContent = `${a.rule_name} · ${a.endpoint_hostname || 'network'} · ${ago(a.timestamp)}`;
 
   const rows = [
-    ['Severity',   `<span class="badge b-${a.severity}">${a.severity}</span>`],
-    ['Rule',       `<span class="mono">${esc(a.rule_name)}</span>`],
-    ['Endpoint',   esc(a.endpoint_hostname || 'network')],
-    ['Indicator',  `<span class="adg-value mono">${esc(a.indicator)}</span>`],
+    ['Severity',    `<span class="badge b-${a.severity}">${a.severity}</span>`],
+    ['Rule',        `<span class="mono">${esc(a.rule_name)}</span>`],
+    ['Endpoint',    esc(a.endpoint_hostname || 'network')],
+    ['Indicator',   `<span class="adg-value mono">${esc(a.indicator)}</span>`],
     ['Description', esc(a.description)],
-    ['Time',       esc(a.timestamp)],
+    ['Time',        esc(a.timestamp)],
   ];
 
   let html = '<div class="alert-detail-grid">';
@@ -800,7 +829,7 @@ function showAlertDetail(id) {
       ['PID',         d.pid != null ? String(d.pid) : '—'],
       ['Remote IP',   `<span class="adg-value mono">${esc(d.remote_ip ?? '—')}</span>`],
       ['Remote Port', d.remote_port != null ? String(d.remote_port) : '—'],
-      ['Local Port',  d.local_port != null ? String(d.local_port) : '—'],
+      ['Local Port',  d.local_port  != null ? String(d.local_port)  : '—'],
       ['Conn Status', esc(d.status ?? '—')],
       ['Detected At', esc(d.detected_at ?? '—')],
     ];
@@ -828,7 +857,7 @@ async function ack(id) {
 
 async function ackAll() {
   const sev = curFilter === 'all' ? '' : `?severity=${curFilter}`;
-  const res = await api(`/api/alerts/acknowledge-all${sev}`, {method:'POST'});
+  await api(`/api/alerts/acknowledge-all${sev}`, {method:'POST'});
   await refresh();
 }
 
@@ -851,15 +880,12 @@ async function refresh() {
 
     const na = dash.alerts_24h;
     document.getElementById('s-alerts').textContent = na;
-    document.getElementById('s-alerts').className = 'card-value ' + (na > 0 ? 'warn' : 'ok');
+    document.getElementById('s-alerts').className   = 'card-value ' + (na > 0 ? 'warn' : 'ok');
 
     const nc = dash.critical_24h;
     document.getElementById('s-crit').textContent = nc;
-    document.getElementById('s-crit').className = 'card-value ' + (nc > 0 ? 'critical' : 'ok');
+    document.getElementById('s-crit').className   = 'card-value ' + (nc > 0 ? 'critical' : 'ok');
 
-    const agentEps = eps.filter(e => !POLLER_PLATFORMS.has(e.platform));
-    document.getElementById('s-ep').textContent = agentEps.filter(e => e.online).length;
-    document.getElementById('s-ep-sub').textContent = `of ${agentEps.length} total`;
     document.getElementById('s-events').textContent = (dash.events_24h||0).toLocaleString();
 
     allAlerts  = alerts;
@@ -894,7 +920,7 @@ function renderDevices(devs) {
   }
   el.innerHTML = devs.map(d => {
     const isNew = !d.known;
-    const uid = 'rd-' + (d.ip||'').replace(/\./g,'-');
+    const uid   = 'rd-' + (d.ip||'').replace(/\./g,'-');
     return `<div class="dev-row ${isNew?'new':''}">
       <div>
         <div>
@@ -930,7 +956,9 @@ function stateClass(s) {
 }
 
 function renderCloud(instances) {
-  document.getElementById('cloud-count').textContent = instances.length;
+  _cloudCount = instances.length;
+  if (curInfraTab === 'aws') document.getElementById('infra-count').textContent = _cloudCount;
+
   const el = document.getElementById('cloud-body');
   if (!instances.length) {
     el.innerHTML = '<div class="empty">No instances — start the AWS poller to discover EC2.</div>';
@@ -938,8 +966,8 @@ function renderCloud(instances) {
   }
 
   const rows = instances.map(i => {
-    const label    = esc(i.name || i.instance_id);
-    const sgPills  = (i.sg_issues || []).map(issue =>
+    const label   = esc(i.name || i.instance_id);
+    const sgPills = (i.sg_issues || []).map(issue =>
       `<span class="sg-pill sg-${issue.severity}" title="${esc(issue.description)}">
         ⚠ ${esc(issue.port_desc)}
       </span>`
@@ -977,9 +1005,14 @@ function renderCloud(instances) {
 
 // ── Docker ────────────────────────────────────────────────────
 function renderDocker(containers) {
-  document.getElementById('docker-count').textContent = containers.length;
+  _dockerCount = containers.length;
+  if (curInfraTab === 'docker') document.getElementById('infra-count').textContent = _dockerCount;
+
   const el = document.getElementById('docker-body');
-  if (!containers.length) { el.innerHTML = '<div class="empty">No containers — start the Docker poller.</div>'; return; }
+  if (!containers.length) {
+    el.innerHTML = '<div class="empty">No containers — start the Docker poller.</div>';
+    return;
+  }
 
   const rows = containers.map(c => {
     const pills = (c.issues||[]).map(i =>
@@ -1005,25 +1038,31 @@ function renderDocker(containers) {
 let allPods = [];
 
 function phaseClass(p) {
-  if (p === 'Running')           return 'phase-running';
-  if (p === 'Pending')           return 'phase-pending';
-  if (p === 'CrashLoopBackOff')  return 'phase-crashloop';
-  if (p === 'Failed')            return 'phase-failed';
+  if (p === 'Running')          return 'phase-running';
+  if (p === 'Pending')          return 'phase-pending';
+  if (p === 'CrashLoopBackOff') return 'phase-crashloop';
+  if (p === 'Failed')           return 'phase-failed';
   return 'phase-other';
 }
 
 function renderK8s() {
   const hideSystem = document.getElementById('k8s-hide-sys')?.checked;
   const pods = hideSystem ? allPods.filter(p => !p.system) : allPods;
-  document.getElementById('k8s-count').textContent = pods.length;
+
+  _k8sCount = pods.length;
+  if (curInfraTab === 'k8s') document.getElementById('infra-count').textContent = _k8sCount;
+
   const el = document.getElementById('k8s-body');
-  if (!pods.length) { el.innerHTML = '<div class="empty">No pods — start the K8s poller.</div>'; return; }
+  if (!pods.length) {
+    el.innerHTML = '<div class="empty">No pods — start the K8s poller.</div>';
+    return;
+  }
 
   const rows = pods.map(p => {
     const pills = (p.issues||[]).map(i =>
       `<span class="issue-pill ip-${i.severity}" title="${esc(i.description)}">⚠ ${i.severity}</span>`
     ).join('');
-    const sys = p.system ? '<span class="sys-badge">sys</span>' : '';
+    const sys      = p.system ? '<span class="sys-badge">sys</span>' : '';
     const restarts = p.restarts > 0
       ? `<span style="color:${p.restarts>10?'var(--critical)':'var(--muted)'};font-size:11px">${p.restarts}↺</span>`
       : '—';
@@ -1042,7 +1081,7 @@ function renderK8s() {
 }
 
 // ── Events modal ──────────────────────────────────────────────
-let _modalTab = 'processes';
+let _modalTab  = 'processes';
 let _snapshots = [];
 
 async function openEventsModal() {
@@ -1086,9 +1125,9 @@ function renderModal() {
 
     body.innerHTML = snaps.map(snap => {
       const rows = snap.processes.map(p => {
-        const cpu = p.cpu || 0;
+        const cpu      = p.cpu || 0;
         const barColor = cpu > 80 ? 'fire' : cpu > 40 ? 'hot' : '';
-        const barW = Math.min(100, Math.round(cpu));
+        const barW     = Math.min(100, Math.round(cpu));
         const hasConns = p.connections > 0;
         return `<tr>
           <td>
@@ -1130,7 +1169,7 @@ function renderModal() {
       }
 
       const rows = snap.connections.map(c => {
-        const uid = 'mc-' + (c.raddr||'').replace(/[.:]/g, '-');
+        const uid   = 'mc-' + (c.raddr||'').replace(/[.:]/g, '-');
         const isBad = c.is_malicious;
         return `<tr>
           <td>
