@@ -22,7 +22,7 @@ sys.path.insert(0, os.path.dirname(__file__))
 
 from database import get_db, engine, Base
 from models import Endpoint, Event, Alert, NetworkDevice, CloudInstance, DockerContainer, K8sPod
-from detection.engine import DetectionEngine
+from detection.engine import DetectionEngine, BENIGN_K8S_NAMESPACES
 from detection.threat_intel import ThreatIntel
 
 logging.basicConfig(
@@ -580,6 +580,8 @@ def _process_k8s_scan(pods: list, services: list, context: str):
                 .first()
             )
 
+            benign_ns = ns in BENIGN_K8S_NAMESPACES
+
             if not existing:
                 kp = K8sPod(
                     context=context,
@@ -596,7 +598,7 @@ def _process_k8s_scan(pods: list, services: list, context: str):
                 )
                 db.add(kp)
                 db.flush()
-                if not p.get("system"):
+                if not p.get("system") and not benign_ns:
                     db.add(
                         Alert(
                             endpoint_hostname=context,
@@ -609,19 +611,30 @@ def _process_k8s_scan(pods: list, services: list, context: str):
                         )
                     )
             else:
-                if existing.phase != phase:
+                if existing.phase != phase and not benign_ns:
                     sev = "high" if phase == "CrashLoopBackOff" else "medium"
-                    db.add(
-                        Alert(
-                            endpoint_hostname=context,
-                            rule_name="K8S_POD_STATE_CHANGE",
-                            severity=sev,
-                            title=f"Pod state changed: {ns}/{name}",
-                            description=f"{existing.phase} → {phase}  restarts: {p.get('restarts', 0)}",
-                            indicator=f"{ns}/{name}",
-                            timestamp=datetime.utcnow(),
+                    dedup_window = datetime.utcnow() - timedelta(hours=1)
+                    already_alerted = (
+                        db.query(Alert)
+                        .filter(
+                            Alert.rule_name == "K8S_POD_STATE_CHANGE",
+                            Alert.indicator == f"{ns}/{name}",
+                            Alert.timestamp > dedup_window,
                         )
+                        .first()
                     )
+                    if not already_alerted:
+                        db.add(
+                            Alert(
+                                endpoint_hostname=context,
+                                rule_name="K8S_POD_STATE_CHANGE",
+                                severity=sev,
+                                title=f"Pod state changed: {ns}/{name}",
+                                description=f"{existing.phase} → {phase}  restarts: {p.get('restarts', 0)}",
+                                indicator=f"{ns}/{name}",
+                                timestamp=datetime.utcnow(),
+                            )
+                        )
                 existing.phase = phase
                 existing.restarts = p.get("restarts", existing.restarts)
                 existing.issues = json.dumps(p.get("issues", []))

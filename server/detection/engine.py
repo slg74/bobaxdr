@@ -14,6 +14,18 @@ logger = logging.getLogger(__name__)
 
 # Processes that legitimately make many connections — suppress false positives
 # Comparison is lowercased, so "Google" matches "google" etc.
+# K8s namespaces whose pods are expected to be noisy (monitoring agents, etc.)
+# Pods in these namespaces suppress K8S_POD_STATE_CHANGE and NEW_K8S_POD alerts.
+BENIGN_K8S_NAMESPACES = {
+    "newrlic",
+    "newrelic",
+    "kube-system",
+    "monitoring",
+    "observability",
+    "cert-manager",
+    "ingress-nginx",
+}
+
 BENIGN_PROCESSES = {
     "chrome",
     "firefox",
