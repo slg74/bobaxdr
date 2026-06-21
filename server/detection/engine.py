@@ -159,6 +159,10 @@ _BENIGN_DESTINATION_NETWORKS = [
     ipaddress.ip_network("64.251.192.0/20"),
     # Canonical — Ubuntu NTP (ntp.ubuntu.com) and core infra (91.189.88.0-91.189.95.255)
     ipaddress.ip_network("91.189.88.0/21"),
+    # Cloudflare — CDN, Workers, WARP, and any app routing through Cloudflare infrastructure
+    ipaddress.ip_network("172.64.0.0/13"),
+    ipaddress.ip_network("104.16.0.0/13"),
+    ipaddress.ip_network("104.24.0.0/14"),
 ]
 
 
