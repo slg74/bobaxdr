@@ -157,6 +157,8 @@ _BENIGN_DESTINATION_NETWORKS = [
     ipaddress.ip_network("185.221.84.0/22"),
     ipaddress.ip_network("212.32.0.0/20"),
     ipaddress.ip_network("64.251.192.0/20"),
+    # Canonical — Ubuntu NTP (ntp.ubuntu.com) and core infra (91.189.88.0-91.189.95.255)
+    ipaddress.ip_network("91.189.88.0/21"),
 ]
 
 
