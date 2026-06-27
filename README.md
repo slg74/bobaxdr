@@ -16,7 +16,7 @@ Compatible with any home internet provider (Spectrum, Google Fiber, AT&T U-verse
 
 ## CLI — `sls`
 
-`sls` (Security List Status) is a Rust command-line companion that gives a fast at-a-glance view of your entire environment without opening a browser. It queries the BobaxDR API and prints every endpoint, AWS instance, and Kubernetes pod alongside its current security status — green for clear, red/yellow for active alerts.
+`sls` (Security List Status) is a Rust command-line companion that gives a fast at-a-glance view of your entire environment without opening a browser. It queries the BobaxDR API and prints every endpoint, AWS instance, and Kubernetes pod alongside its current security status — green for clear, red/yellow for active alerts. Test.
 
 ![sls output](sls_new.png)
 
